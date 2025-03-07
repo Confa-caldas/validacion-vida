@@ -1,0 +1,7 @@
+#video {
+    transform: scaleX(-1);  /* Esto voltea la imagen horizontalmente, como un espejo */
+    -webkit-transform: scaleX(-1); /* Para compatibilidad con Safari */
+    display: block;
+    margin: 0 auto;
+  }
+  
