@@ -105,7 +105,7 @@ export class LiveCheckComponent implements OnInit {
           clearInterval(interval);
           this.showMessage(`✅ Movimiento correcto: ${action}`);
           this.currentStep++;
-          setTimeout(() => this.nextStep(), 2000);
+          setTimeout(() => this.nextStep(), 3000);
         } else if (Date.now() - startTime > 6000) {
           clearInterval(interval);
           this.validationFailed = true;
