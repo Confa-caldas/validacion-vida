@@ -16,6 +16,8 @@ export class LiveCheckComponent implements OnInit {
   actionText = '';
   lastDetectedAction: string | null = null;
   validationFailed = false;
+  countdown: number = 3;
+  intervalId: any;
 
   ngOnInit(): void {
     this.loadModels();
@@ -52,16 +54,13 @@ export class LiveCheckComponent implements OnInit {
     this.currentStep = 0;
     this.waitingForAction = false;
     this.validationFailed = false;
-
-    const movimientos = ['izquierda', 'derecha'];
-    this.steps = this.shuffleArray(movimientos);
-    this.steps.push('centro'); // Último paso siempre es mirar al frente
+    this.steps = this.shuffleArray(['izquierda', 'derecha']);
+    this.steps.push('centro');
     this.nextStep();
   }
 
   nextStep() {
-    if (this.validationFailed) return; // Si falló, no seguir
-
+    if (this.validationFailed) return;
     if (this.currentStep >= this.maxSteps) {
       this.showMessage('✅ Validación exitosa.');
       return;
@@ -71,16 +70,22 @@ export class LiveCheckComponent implements OnInit {
     this.actionText = `➡ Próximo movimiento: ${this.steps[this.currentStep]}`;
     this.showMessage(this.actionText, true);
 
-    setTimeout(() => {
-      this.waitingForAction = true;
-      this.showMessage(`🔄 Ahora gira la cabeza hacia: ${this.steps[this.currentStep]}`, true);
-      this.validateMovement();
-    }, 2000);
+    this.countdown = 3;
+    this.intervalId = setInterval(() => {
+      if (this.countdown > 0) {
+        this.showMessage(`⏳ Prepárate: ${this.countdown}...`, true);
+        this.countdown--;
+      } else {
+        clearInterval(this.intervalId);
+        this.waitingForAction = true;
+        this.showMessage(`🔄 Ahora gira la cabeza hacia: ${this.steps[this.currentStep]}`, true);
+        this.validateMovement();
+      }
+    }, 1000);
   }
 
   validateMovement() {
     if (!this.videoElement) return;
-
     let startTime = Date.now();
     this.lastDetectedAction = null;
 
@@ -94,7 +99,6 @@ export class LiveCheckComponent implements OnInit {
 
       if (detections) {
         const action = this.getAction(detections.landmarks);
-
         if (action !== this.lastDetectedAction) {
           this.lastDetectedAction = action;
         }
@@ -105,7 +109,7 @@ export class LiveCheckComponent implements OnInit {
           clearInterval(interval);
           this.showMessage(`✅ Movimiento correcto: ${action}`);
           this.currentStep++;
-          setTimeout(() => this.nextStep(), 3000);
+          setTimeout(() => this.nextStep(), 2000);
         } else if (Date.now() - startTime > 6000) {
           clearInterval(interval);
           this.validationFailed = true;
@@ -118,16 +122,14 @@ export class LiveCheckComponent implements OnInit {
   getAction(landmarks: faceapi.FaceLandmarks68): string {
     const nose = landmarks.getNose();
     const jaw = landmarks.getJawOutline();
-
     const noseTip = nose[3].x;
     const leftJaw = jaw[0].x;
     const rightJaw = jaw[16].x;
     const faceCenter = (leftJaw + rightJaw) / 2;
     const threshold = 25;
 
-    // 🔄 Corrección del modo espejo:
-    if (noseTip > faceCenter + threshold) return 'derecha'; // Ajustado al modo espejo
-    if (noseTip < faceCenter - threshold) return 'izquierda'; // Ajustado al modo espejo
+    if (noseTip < faceCenter - threshold) return 'derecha';
+    if (noseTip > faceCenter + threshold) return 'izquierda';
     return 'centro';
   }
 
@@ -140,7 +142,6 @@ export class LiveCheckComponent implements OnInit {
     if (messageElement) {
       messageElement.innerHTML = message;
     }
-
     if (showOnCamera) {
       const cameraOverlay = document.getElementById('camera-overlay');
       if (cameraOverlay) {
