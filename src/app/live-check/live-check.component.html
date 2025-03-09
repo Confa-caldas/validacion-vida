@@ -1,17 +1,14 @@
-<div class="container">
-  <h1>Validación de Movimientos</h1>
-  
-  <div class="button-group">
-    <button (click)="startCamera()" class="btn">📷 Iniciar Cámara</button>
-    <button (click)="startMovementValidation()" class="btn">✅ Validar Movimiento</button>
-    <button (click)="stopCamera()" class="btn">❌ Cerrar Cámara</button>
-  </div>
+<div class="controls">
+  <button (click)="startCamera()">Iniciar Cámara</button>
+  <button (click)="startMovementValidation()">Iniciar Validación</button>
+  <button (click)="stopCamera()">Cerrar Cámara</button>
+</div>
 
-  <p id="message" class="message-box">Esperando...</p>
+<div class="camera-container">
+  <video id="video" autoplay playsinline></video>
 
-  <div class="video-container">
-    <video id="video" autoplay class="video"></video>
-    <div id="camera-overlay" class="overlay">Esperando...</div>
-    <div *ngIf="countdown > 0" class="countdown">{{ countdown }}</div>
+  <!-- Overlay para mostrar instrucciones y estado -->
+  <div id="camera-overlay" class="overlay-message">
+    Esperando...
   </div>
 </div>
