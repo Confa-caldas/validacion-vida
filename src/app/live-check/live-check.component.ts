@@ -18,19 +18,21 @@ export class LiveCheckComponent implements OnInit {
 
   waitingForAction = false;
   validationFailed = false;
-  movementInterval: any = null;
+  isRunningValidation = false;
 
   countdown: number = 3;
   countdownInterval: any;
+  movementInterval: any;
 
   ngOnInit(): void {
     this.loadModels();
   }
 
   async loadModels() {
-    await faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights');
-    await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights');
-    console.log('✅ Modelos cargados');
+    await faceapi.nets.ssdMobilenetv1.loadFromUri('/assets/modelos');
+    await faceapi.nets.faceLandmark68Net.loadFromUri('/assets/modelos');
+
+    console.log('✅ MODELOS CARGADOS');
   }
 
   startCamera() {
@@ -41,11 +43,13 @@ export class LiveCheckComponent implements OnInit {
 
         if (this.videoElement) {
           this.videoElement.srcObject = stream;
-          this.videoElement.play();
-          this.createCanvasOverlay();
+          this.videoElement.onloadedmetadata = () => {
+            this.videoElement!.play();
+            this.createCanvasOverlay();
+          };
         }
       })
-      .catch((err) => console.error('❌ Error con la cámara:', err));
+      .catch((err) => console.error('❌ ERROR CON LA CÁMARA:', err));
   }
 
   stopCamera() {
@@ -63,6 +67,7 @@ export class LiveCheckComponent implements OnInit {
     if (container) {
       container.appendChild(this.canvas);
     }
+
     faceapi.matchDimensions(this.canvas, {
       width: this.videoElement.width,
       height: this.videoElement.height
@@ -70,45 +75,85 @@ export class LiveCheckComponent implements OnInit {
   }
 
   startMovementValidation() {
+    console.clear(); // Para limpieza en cada prueba
+    console.log('[INICIO] startMovementValidation');
+
     this.currentStep = 0;
     this.validationFailed = false;
-
-    if (this.movementInterval) {
-      clearInterval(this.movementInterval);
-      this.movementInterval = null;
-    }
+    this.isRunningValidation = true;
 
     this.steps = this.shuffleArray(['izquierda', 'derecha', 'arriba', 'acercarse']).slice(0, this.maxSteps);
-    console.log('🎲 Movimientos aleatorios:', this.steps);
+    console.log('🎲 MOVIMIENTOS ALEATORIOS:', this.steps);
 
-    this.nextStep();
+    this.nextStep(); // Inicia el primer paso
   }
 
   nextStep() {
-    if (this.validationFailed) return;
+    console.log('[INICIO] nextStep');
 
-    if (this.currentStep >= this.maxSteps) {
-      this.showMessage('✅ Validación exitosa.', 'success');
+    if (this.validationFailed || !this.isRunningValidation) {
+      console.warn('⚠️ Validación cancelada o ya terminada.');
       return;
     }
 
+    if (this.currentStep >= this.maxSteps) {
+      this.finalizarValidacion();
+      return;
+    }
+
+    const pasoActual = this.currentStep + 1;
+    const movimientoActual = this.steps[this.currentStep];
+
+    console.log(`🔎 Paso actual: ${pasoActual}/${this.maxSteps}`);
+    console.log(`➡ Esperando movimiento: ${movimientoActual}`);
+
     this.waitingForAction = false;
 
-    const movimientoActual = this.steps[this.currentStep];
-    const mensaje = `➡ Mueve tu cabeza hacia ${movimientoActual}`;
+    // Mensaje de preparación
+    this.showMessage('🕑 VUELVE AL CENTRO...', 'info');
 
-    this.showMessage(`${mensaje} (Prepárate)`, 'info');
+    setTimeout(() => {
+      const mensaje = `➡ MUEVE TU CABEZA HACIA ${movimientoActual.toUpperCase()}`;
 
-    this.startCountdown(() => {
-      this.showMessage(`${mensaje} ahora`, 'info');
-      this.waitingForAction = true;
-      this.validateMovement();
-    });
+      this.showMessage(`${mensaje} (PREPÁRATE)`, 'info');
+
+      this.startCountdown(() => {
+        this.showMessage(`${mensaje} AHORA`, 'info');
+
+        if (this.waitingForAction) {
+          console.warn('⚠️ Ya estamos esperando un movimiento, no deberíamos iniciar otro.');
+          return;
+        }
+
+        this.waitingForAction = true;
+
+        // Aquí NO incrementamos currentStep, solo iniciamos la validación
+        this.validateMovement(movimientoActual);
+      });
+    }, 1500);
+  }
+
+  finalizarValidacion() {
+    console.log('[INICIO] finalizarValidacion');
+
+    if (!this.isRunningValidation) {
+      console.warn('⚠️ Ya se finalizó la validación.');
+      return;
+    }
+
+    this.isRunningValidation = false;
+    this.waitingForAction = false;
+    this.clearIntervals();
+
+    this.showMessage('✅ VALIDACIÓN EXITOSA.', 'success');
+    console.log(`🎉 Validación completada en paso: ${this.currentStep}/${this.maxSteps}`);
   }
 
   startCountdown(callback: () => void) {
     this.countdown = 3;
     this.updateCountdownDisplay();
+
+    if (this.countdownInterval) clearInterval(this.countdownInterval);
 
     this.countdownInterval = setInterval(() => {
       this.countdown--;
@@ -123,28 +168,25 @@ export class LiveCheckComponent implements OnInit {
 
   updateCountdownDisplay() {
     const movimientoActual = this.steps[this.currentStep];
-    const mensaje = `➡ Mueve tu cabeza hacia ${movimientoActual}`;
+    const mensaje = `➡ MUEVE TU CABEZA HACIA ${movimientoActual.toUpperCase()}`;
 
-    this.showMessage(`${mensaje} (En ${this.countdown})`, 'info');
+    this.showMessage(`${mensaje} (EN ${this.countdown})`, 'info');
   }
 
-  validateMovement() {
+  validateMovement(movimientoEsperado: string) {
+    console.log('[INICIO] validateMovement');
+
     if (!this.videoElement) return;
 
     let startTime = Date.now();
-    const movimientoEsperado = this.steps[this.currentStep];
 
     if (this.movementInterval) {
       clearInterval(this.movementInterval);
-      this.movementInterval = null;
     }
 
-    console.log(`🔎 Paso actual: ${this.currentStep + 1}/${this.maxSteps}. Esperando movimiento: ${movimientoEsperado}`);
-
     this.movementInterval = setInterval(async () => {
-      if (!this.waitingForAction) {
+      if (!this.waitingForAction || this.validationFailed) {
         clearInterval(this.movementInterval);
-        this.movementInterval = null;
         return;
       }
 
@@ -158,25 +200,24 @@ export class LiveCheckComponent implements OnInit {
         if (esCorrecto) {
           console.log(`✅ Movimiento ${movimientoEsperado} detectado correctamente.`);
 
-          clearInterval(this.movementInterval);
-          this.movementInterval = null;
           this.waitingForAction = false;
+          clearInterval(this.movementInterval);
 
-          this.showMessage(`✅ Movimiento ${movimientoEsperado} correcto`, 'success');
+          this.showMessage(`✅ MOVIMIENTO ${movimientoEsperado.toUpperCase()} CORRECTO`, 'success');
 
+          // Aquí incrementamos currentStep
           this.currentStep++;
 
-          // Espera antes de pasar al siguiente paso
           setTimeout(() => this.nextStep(), 1500);
         } else if (Date.now() - startTime > 3000) {
-          console.log(`❌ Tiempo agotado o movimiento incorrecto en: ${movimientoEsperado}`);
+          console.log(`❌ Tiempo agotado o movimiento incorrecto`);
 
-          clearInterval(this.movementInterval);
-          this.movementInterval = null;
           this.waitingForAction = false;
+          clearInterval(this.movementInterval);
+
           this.validationFailed = true;
 
-          this.showMessage('❌ Tiempo agotado o movimiento incorrecto.', 'error');
+          this.showMessage('❌ TIEMPO AGOTADO O MOVIMIENTO INCORRECTO.', 'error');
         }
       }
     }, 300);
@@ -196,27 +237,21 @@ export class LiveCheckComponent implements OnInit {
     const faceCenterX = (leftJawX + rightJawX) / 2;
     const faceCenterY = chinY;
 
-    // Umbrales de sensibilidad
-    const horizontalThreshold = 15;  // izquierda/derecha
-    const verticalThreshold = 80;    // levantar cabeza
-    const acercarseThreshold = 250;  // acercar cara
+    const horizontalThreshold = 15;
+    const verticalThreshold = 85;
+    const acercarseThreshold = 220;
 
     const faceWidth = rightJawX - leftJawX;
 
-    // Detectar SOLO el movimiento que toca en este paso
     switch (movimientoEsperado) {
       case 'derecha':
         return noseTipX < faceCenterX - horizontalThreshold;
-
       case 'izquierda':
         return noseTipX > faceCenterX + horizontalThreshold;
-
       case 'arriba':
         return noseTipY < faceCenterY - verticalThreshold;
-
       case 'acercarse':
         return faceWidth > acercarseThreshold;
-
       default:
         return false;
     }
@@ -226,8 +261,8 @@ export class LiveCheckComponent implements OnInit {
     if (!this.canvas || !this.videoElement) return;
 
     const dims = {
-      width: this.videoElement.width,
-      height: this.videoElement.height
+      width: this.videoElement.width || 640,
+      height: this.videoElement.height || 480
     };
 
     const resizedLandmarks = faceapi.resizeResults(landmarks, dims);
@@ -260,8 +295,7 @@ export class LiveCheckComponent implements OnInit {
     const cameraOverlay = document.getElementById('camera-overlay');
 
     if (cameraOverlay) {
-      const formattedMessage = message.charAt(0).toUpperCase() + message.slice(1);
-      cameraOverlay.innerHTML = formattedMessage;
+      cameraOverlay.innerHTML = message.toUpperCase();
 
       switch (type) {
         case 'success':
@@ -274,5 +308,10 @@ export class LiveCheckComponent implements OnInit {
           cameraOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
       }
     }
+  }
+
+  clearIntervals() {
+    if (this.countdownInterval) clearInterval(this.countdownInterval);
+    if (this.movementInterval) clearInterval(this.movementInterval);
   }
 }
