@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import * as faceapi from 'face-api.js';
-
+import { environment } from '../../environments/environment';
 @Component({
   selector: 'app-live-check',
   templateUrl: './live-check.component.html',
@@ -29,8 +29,9 @@ export class LiveCheckComponent implements OnInit {
   }
 
   async loadModels() {
-    await faceapi.nets.ssdMobilenetv1.loadFromUri('/assets/modelos');
-    await faceapi.nets.faceLandmark68Net.loadFromUri('/assets/modelos');
+    await faceapi.nets.ssdMobilenetv1.loadFromUri(`${environment.basePath}/assets/modelos`);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(`${environment.basePath}/assets/modelos`);
+
     console.log('✅ MODELOS CARGADOS');
   }
 
