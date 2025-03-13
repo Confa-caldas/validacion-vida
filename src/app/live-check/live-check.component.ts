@@ -30,7 +30,7 @@ export class LiveCheckComponent implements OnInit {
 
   async loadModels() {
     await faceapi.nets.ssdMobilenetv1.loadFromUri(`${environment.basePath}/assets/modelos`);
-  await faceapi.nets.faceLandmark68Net.loadFromUri(`${environment.basePath}/assets/modelos`);
+    await faceapi.nets.faceLandmark68Net.loadFromUri(`${environment.basePath}/assets/modelos`);
 
     console.log('✅ MODELOS CARGADOS');
   }
