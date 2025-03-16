@@ -1,394 +1,313 @@
-import { Component, OnInit } from '@angular/core';
-import * as faceapi from 'face-api.js';
-import { environment } from '../../environments/environment';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { FaceLandmarker, FilesetResolver, FaceLandmarkerResult } from '@mediapipe/tasks-vision';
+
 @Component({
   selector: 'app-live-check',
   templateUrl: './live-check.component.html',
   styleUrls: ['./live-check.component.css']
 })
-export class LiveCheckComponent implements OnInit {
+export class LiveCheckComponent implements OnInit, OnDestroy {
 
-  videoElement: HTMLVideoElement | null = null;
-  canvas: HTMLCanvasElement | null = null;
-  stream: MediaStream | null = null;
+  @ViewChild('video') videoRef!: ElementRef<HTMLVideoElement>;
+  @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  currentStep: number = 0;
-  maxSteps = 3;
-  steps: string[] = [];
+  faceLandmarker!: FaceLandmarker;
+  video!: HTMLVideoElement;
+  canvas!: HTMLCanvasElement;
+  ctx!: CanvasRenderingContext2D;
 
-  waitingForAction = false;
-  validationFailed = false;
-  isRunningValidation = false;
+  movimientos = ['arriba', 'abajo', 'izquierda', 'derecha', 'acercarse'];
+  secuenciaMovimientos: string[] = [];
+  pasoActual: number = 0;
 
-  countdown: number = 3;
-  countdownInterval: any;
-  movementInterval: any;
+  esperaCentro = false;
+  validandoMovimiento = false;
+  validationInProgress = false;
+  tiempoLimite: any;
+  contadorPreparacion: number = 3;
 
-  ngOnInit(): void {
-    this.loadModels();
+  statusMessage = 'Presiona "Validar" para comenzar.';
+  distanciaInicial: number | null = null;
+
+  // Variables de parpadeo
+  blinkDetected = false;
+  parpadeoActivo: boolean = false; // Evita conteo doble
+  parpadeosDetectados: number = 0;
+  requeridosParpadeos: number = 3;
+
+  ngOnInit() {
+    // Puedes iniciar cámara aquí si lo deseas
+    // this.iniciarCamara();
+ 
   }
 
-  async loadModels() {
-    await faceapi.nets.ssdMobilenetv1.loadFromUri(`${environment.basePath}/assets/modelos`);
-    await faceapi.nets.faceLandmark68Net.loadFromUri(`${environment.basePath}/assets/modelos`);
-
-    console.log('✅ MODELOS CARGADOS');
+  ngOnDestroy() {
+    this.detenerCamara();
   }
 
-  startCamera() {
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then((stream) => {
-        this.stream = stream;
-        this.videoElement = document.getElementById('video') as HTMLVideoElement;
-
-        if (this.videoElement) {
-          this.videoElement.srcObject = stream;
-          this.videoElement.onloadedmetadata = () => {
-            this.videoElement!.play();
-            this.createCanvasOverlay();
-          };
-        }
-      })
-      .catch((err) => console.error('❌ ERROR CON LA CÁMARA:', err));
+  resizeCanvas() {
+    this.canvas.width = window.innerWidth;
+  this.canvas.height = window.innerHeight;
   }
 
-  stopCamera() {
-    if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
-    }
-    this.stream = null;
+  async iniciarCamara() {
+    this.video = this.videoRef.nativeElement;
+    this.canvas = this.canvasRef.nativeElement;
+    this.ctx = this.canvas.getContext('2d')!;
+
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    this.video.srcObject = stream;
+    await this.video.play();
+
+    await this.cargarModelo();
+    this.procesarVideo();
   }
 
-  createCanvasOverlay() {
-    if (!this.videoElement) return;
+  detenerCamara() {
+    const stream = this.video?.srcObject as MediaStream;
+    stream?.getTracks().forEach(track => track.stop());
+  }
 
-    this.canvas = faceapi.createCanvasFromMedia(this.videoElement);
-    const container = document.getElementById('video-container');
-    if (container) {
-      container.appendChild(this.canvas);
-    }
+  async cargarModelo() {
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    );
 
-    faceapi.matchDimensions(this.canvas, {
-      width: this.videoElement.width,
-      height: this.videoElement.height
+    this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: '/assets/modelos/face_landmarker.task'
+      },
+      runningMode: 'VIDEO',
+      outputFaceBlendshapes: false,
+      outputFacialTransformationMatrixes: true
     });
   }
 
-  startMovementValidation() {
-    console.clear();
-    console.log('[INICIO] Validación de movimientos');
+  procesarVideo() {
+    const processFrame = async () => {
+      if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+        this.canvas.width = this.video.videoWidth;
+        this.canvas.height = this.video.videoHeight;
+        this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
 
-    this.currentStep = 0;
-    this.validationFailed = false;
-    this.isRunningValidation = true;
+        const results: FaceLandmarkerResult = this.faceLandmarker.detectForVideo(this.video, performance.now());
+        if (results.faceLandmarks.length > 0) {
+          const face = results.faceLandmarks[0];
 
-    this.steps = this.shuffleArray(['izquierda', 'derecha', 'arriba', 'acercarse']).slice(0, this.maxSteps);
-    console.log('🎲 Secuencia de movimientos:', this.steps);
+          if (face.length < 478) {
+            console.warn('⚠️ Landmarks insuficientes para detectar parpadeo y movimientos');
+          } else {
+            this.procesarDeteccion(face, results);
+          }
+        }
+      }
 
-    this.nextStep();
+      requestAnimationFrame(processFrame);
+    };
+
+    processFrame();
   }
 
-  nextStep() {
-    console.log('[INICIO] nextStep()');
+  iniciarValidacion() {
+    this.resetValidacion();
+    if (this.validationInProgress) return;
 
-    if (this.validationFailed || !this.isRunningValidation) {
-      console.warn('⚠️ Validación finalizada o fallida. nextStep cancelado.');
-      return;
+    console.log('🔄 Reiniciando validación...');
+    this.validationInProgress = true;
+    this.statusMessage = '🔄 Preparando validación...';
+
+    // Secuencia aleatoria de 3 movimientos (sin repetir)
+    this.secuenciaMovimientos = this.shuffleArray([...this.movimientos]).slice(0, 3);
+    this.pasoActual = 0;
+    this.parpadeosDetectados = 0;
+    this.distanciaInicial = null;
+
+    this.esperaCentro = true;
+    this.validandoMovimiento = false;
+
+    console.log('🎲 Secuencia:', this.secuenciaMovimientos);
+    this.statusMessage = '🕒 Alinea el rostro al centro...';
+  }
+
+  procesarDeteccion(face: any[], results: FaceLandmarkerResult) {
+    // Siempre analiza el parpadeo
+    this.verificarParpadeo(face);
+
+    if (!this.validationInProgress) return;
+
+    const nose = face[1];
+    if (!nose) return;
+
+    if (this.esperaCentro) {
+      if (this.estaCentrado(nose)) {
+        this.esperaCentro = false;
+        this.prepararSiguienteMovimiento();
+      } else {
+        this.statusMessage = '🕒 Alinea el rostro al centro...';
+      }
+    } else if (this.validandoMovimiento) {
+      this.verificarMovimiento(face, nose);
     }
+  }
 
-    if (this.waitingForAction) {
-      console.warn('⚠️ Aún esperando un movimiento anterior. nextStep cancelado.');
-      return;
-    }
+  prepararSiguienteMovimiento() {
+    this.statusMessage = `Prepárate para "${this.secuenciaMovimientos[this.pasoActual]}"...`;
+    this.contadorPreparacion = 3;
 
-    if (this.currentStep >= this.maxSteps) {
-      console.log('✅ Todos los pasos completados.');
-      this.finalizarValidacion();
-      return;
-    }
+    const interval = setInterval(() => {
+      if (this.contadorPreparacion <= 0) {
+        clearInterval(interval);
+        this.statusMessage = `Realiza el movimiento: "${this.secuenciaMovimientos[this.pasoActual]}"`;
 
-    const pasoActual = this.currentStep + 1;
-    const movimientoActual = this.steps[this.currentStep];
+        this.validandoMovimiento = true;
 
-    console.log(`➡ Preparando el paso ${pasoActual}/${this.maxSteps}: ${movimientoActual.toUpperCase()}`);
-
-    this.waitingForAction = false;
-
-    this.showMessage('🕑 VUELVE AL CENTRO...', 'info');
-
-    // Tiempo para que el usuario vuelva al centro antes de iniciar el countdown
-    setTimeout(() => {
-      const mensaje = `➡ MUEVE TU CABEZA HACIA ${movimientoActual.toUpperCase()}`;
-      this.showMessage(`${mensaje} (PREPÁRATE)`, 'info');
-
-      this.startCountdown(() => {
-        if (this.waitingForAction) {
-          console.warn('⚠️ Aún esperando otro movimiento. No iniciamos nueva validación.');
-          return;
-        }
-
-        console.log(`🚦 Iniciando validación de: ${movimientoActual}`);
-        this.showMessage(`${mensaje} AHORA`, 'info');
-
-        this.waitingForAction = true;
-
-        // Pequeño delay antes de empezar a validar (opcional, para estabilidad)
-        setTimeout(() => {
-          this.validateMovement(movimientoActual);
-        }, 500);
-      });
+        this.tiempoLimite = setTimeout(() => {
+          this.falloValidacion('⏰ Tiempo agotado');
+        }, 6000);
+      } else {
+        this.statusMessage = `Prepárate para "${this.secuenciaMovimientos[this.pasoActual]}" en ${this.contadorPreparacion}...`;
+        this.contadorPreparacion--;
+      }
     }, 1000);
+  }
+
+  verificarMovimiento(face: any[], nose: any) {
+    const movimientoActual = this.secuenciaMovimientos[this.pasoActual];
+    const umbral = 0.03;
+
+    const centroX = nose.x;
+    const centroY = nose.y;
+
+    let movimientoDetectado = false;
+
+    switch (movimientoActual) {
+      case 'arriba':
+        movimientoDetectado = centroY < 0.45;
+        break;
+      case 'abajo':
+        movimientoDetectado = centroY > 0.55;
+        break;
+      case 'izquierda':
+        movimientoDetectado = centroX > 0.45;
+        break;
+      case 'derecha':
+        movimientoDetectado = centroX < 0.55;
+        break;
+      case 'acercarse':
+        if (!this.distanciaInicial) {
+          this.distanciaInicial = this.calcularDistanciaEntreOjos(face);
+        }
+        const distanciaActual = this.calcularDistanciaEntreOjos(face);
+        const diferencia = distanciaActual / this.distanciaInicial;
+        movimientoDetectado = diferencia > 1.2; // Umbral de acercamiento
+        break;
+    }
+
+    if (movimientoDetectado) {
+      console.log(`✅ Movimiento "${movimientoActual}" detectado correctamente`);
+      clearTimeout(this.tiempoLimite);
+      this.validandoMovimiento = false;
+
+      this.pasoActual++;
+
+      if (this.pasoActual >= this.secuenciaMovimientos.length) {
+        this.finalizarValidacion();
+      } else {
+        this.esperaCentro = true;
+        this.statusMessage = '🕒 Alinea el rostro al centro para continuar...';
+      }
+    } else {
+      console.log(`❌ Aún no detectado "${movimientoActual}"`);
+    }
+  }
+
+  verificarParpadeo(face: any[]) {
+    const ojoDerechoArriba = face[159];
+    const ojoDerechoAbajo = face[145];
+    const ojoIzquierdoArriba = face[386];
+    const ojoIzquierdoAbajo = face[374];
+
+    const distDerecho = Math.abs(ojoDerechoArriba.y - ojoDerechoAbajo.y);
+    const distIzquierdo = Math.abs(ojoIzquierdoArriba.y - ojoIzquierdoAbajo.y);
+
+    const umbralParpadeo = 0.005;
+
+    if (distDerecho < umbralParpadeo && distIzquierdo < umbralParpadeo) {
+      if (!this.parpadeoActivo) {
+        this.parpadeoActivo = true;
+        this.parpadeosDetectados++;
+        console.log(`👁️‍🗨️ Parpadeo detectado (${this.parpadeosDetectados}/${this.requeridosParpadeos})`);
+      }
+    } else {
+      this.parpadeoActivo = false;
+    }
+  }
+
+  falloValidacion(mensaje: string) {
+    clearTimeout(this.tiempoLimite);
+    this.validationInProgress = false;
+    this.validandoMovimiento = false;
+    this.esperaCentro = false;
+
+    this.statusMessage = `❌ Validación fallida: ${mensaje}. Intenta de nuevo.`;
+    console.log('❌ Fallo en la validación');
   }
 
   finalizarValidacion() {
-    console.log('[INICIO] finalizarValidacion()');
-
-    if (!this.isRunningValidation) {
-      console.warn('⚠️ La validación ya se había finalizado.');
-      return;
+    if (this.parpadeosDetectados >= this.requeridosParpadeos) {
+      this.statusMessage = '✅ Validación exitosa. ¡Bien hecho!';
+      console.log('✔️ Validación completa');
+    } else {
+      this.statusMessage = '❌ Parpadeos insuficientes. Intenta de nuevo.';
+      console.log('❌ Faltaron parpadeos');
     }
 
-    this.isRunningValidation = false;
-    this.waitingForAction = false;
-    this.clearIntervals();
-
-    this.showMessage('✅ VALIDACIÓN EXITOSA.', 'success');
-    console.log(`🎉 Validación completada: ${this.currentStep}/${this.maxSteps}`);
+    //this.resetValidacion();
   }
 
-  startCountdown(callback: () => void) {
-    this.countdown = 3;
-    this.updateCountdownDisplay();
+  resetValidacion() {
+    this.validationInProgress = false;
+    this.validandoMovimiento = false;
+    this.esperaCentro = false;
 
-    if (this.countdownInterval) clearInterval(this.countdownInterval);
+    this.secuenciaMovimientos = [];
+    this.pasoActual = 0;
+    this.parpadeosDetectados = 0;
+    this.distanciaInicial = null;
 
-    console.log(`⏳ Iniciando countdown de ${this.countdown} segundos...`);
+    clearTimeout(this.tiempoLimite);
 
-    this.countdownInterval = setInterval(() => {
-      this.countdown--;
-
-      if (this.countdown > 0) {
-        this.updateCountdownDisplay();
-      } else {
-        clearInterval(this.countdownInterval);
-        this.countdownInterval = null;
-
-        console.log('🚀 Countdown finalizado. Llamando callback...');
-        callback();
-      }
-    }, 1000);
+    this.statusMessage = 'Presiona "Validar" para comenzar de nuevo.';
   }
 
-  updateCountdownDisplay() {
-    const movimientoActual = this.steps[this.currentStep];
-    const mensaje = `➡ MUEVE TU CABEZA HACIA ${movimientoActual.toUpperCase()}`;
+  estaCentrado(nose: any): boolean {
+    const margenX = 0.05;
+    const margenY = 0.05;
 
-    console.log(`📣 ${mensaje} (EN ${this.countdown})`);
-    this.showMessage(`${mensaje} (EN ${this.countdown})`, 'info');
+    return (
+      nose.x > 0.5 - margenX &&
+      nose.x < 0.5 + margenX &&
+      nose.y > 0.5 - margenY &&
+      nose.y < 0.5 + margenY
+    );
   }
 
-  validateMovement(movimientoEsperado: string) {
-    console.log(`[INICIO] validateMovement() - Esperando movimiento: ${movimientoEsperado}`);
+  calcularDistanciaEntreOjos(face: any[]): number {
+    const ojoIzquierdo = face[33];
+    const ojoDerecho = face[263];
 
-    if (!this.videoElement) {
-      console.error('❌ No hay videoElement disponible.');
-      return;
-    }
+    const dx = ojoIzquierdo.x - ojoDerecho.x;
+    const dy = ojoIzquierdo.y - ojoDerecho.y;
 
-    let startTime = Date.now();
-
-    if (this.movementInterval) {
-      clearInterval(this.movementInterval);
-      this.movementInterval = null;
-    }
-
-    this.movementInterval = setInterval(async () => {
-      if (!this.waitingForAction || this.validationFailed) {
-        console.warn('⛔ Cancelando validación. No se espera acción o ya falló.');
-        clearInterval(this.movementInterval!);
-        this.movementInterval = null;
-        return;
-      }
-
-      const detections = await faceapi.detectSingleFace(this.videoElement!).withFaceLandmarks();
-
-      if (detections) {
-        const esCorrecto = this.getAction(detections, movimientoEsperado);
-
-        if (esCorrecto) {
-          console.log(`✅ Movimiento ${movimientoEsperado} detectado correctamente.`);
-
-          // Cortamos de inmediato para evitar doble validación
-          this.waitingForAction = false;
-          clearInterval(this.movementInterval!);
-          this.movementInterval = null;
-
-          this.showMessage(`✅ MOVIMIENTO ${movimientoEsperado.toUpperCase()} CORRECTO`, 'success');
-
-          this.currentStep++;
-
-          // Tiempo antes de pasar al siguiente paso
-          setTimeout(() => {
-            console.log('➡ Avanzando al siguiente paso...');
-            this.nextStep();
-          }, 1000);
-
-          return; // 🚀 IMPORTANTE: salir del interval
-        } else if (Date.now() - startTime > 3000) {
-          console.log(`❌ Tiempo agotado o movimiento incorrecto (${movimientoEsperado})`);
-
-          this.waitingForAction = false;
-          this.validationFailed = true;
-
-          clearInterval(this.movementInterval!);
-          this.movementInterval = null;
-
-          this.showMessage('❌ TIEMPO AGOTADO O MOVIMIENTO INCORRECTO.', 'error');
-
-          // Puedes finalizar el proceso aquí si es necesario
-        }
-      } else {
-        console.warn('❗ No se detectó rostro en la imagen.');
-      }
-    }, 300);
-  }
-
-  getAction(detections: any, movimientoEsperado: string): boolean {
-    const landmarks = detections.landmarks;
-    const nose = landmarks.getNose();
-    const jaw = landmarks.getJawOutline();
-
-    const noseTipX = nose[3].x;
-    const noseTipY = nose[3].y;
-    const leftJawX = jaw[0].x;
-    const rightJawX = jaw[16].x;
-    const chinY = jaw[8].y;
-
-    const faceCenterX = (leftJawX + rightJawX) / 2;
-    const faceCenterY = chinY;
-
-    const horizontalThreshold = 15;
-    const verticalThreshold = 80;
-    const acercarseThreshold = 200;
-
-    const faceWidth = rightJawX - leftJawX;
-
-    console.log('🔍 Valores detectados:', {
-      noseTipX,
-      noseTipY,
-      faceCenterX,
-      faceCenterY,
-      faceWidth
-    });
-
-    switch (movimientoEsperado) {
-      case 'derecha':
-        return noseTipX < faceCenterX - horizontalThreshold;
-      case 'izquierda':
-        return noseTipX > faceCenterX + horizontalThreshold;
-      case 'arriba':
-        return noseTipY < faceCenterY - verticalThreshold;
-      case 'acercarse':
-        return faceWidth > acercarseThreshold;
-      default:
-        return false;
-    }
-  }
-
-  drawOverlay(landmarks: faceapi.FaceLandmarks68) {
-    if (!this.canvas || !this.videoElement) return;
-
-    const dims = {
-      width: this.videoElement.width || 640,
-      height: this.videoElement.height || 480
-    };
-
-    const resizedLandmarks = faceapi.resizeResults(landmarks, dims);
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-    ctx.strokeStyle = 'green';
-    ctx.lineWidth = 2;
-
-    ctx.beginPath();
-    ctx.moveTo(this.canvas.width / 2, 0);
-    ctx.lineTo(this.canvas.width / 2, this.canvas.height);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(0, this.canvas.height / 2);
-    ctx.lineTo(this.canvas.width, this.canvas.height / 2);
-    ctx.stroke();
-
-    faceapi.draw.drawFaceLandmarks(this.canvas, resizedLandmarks);
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   shuffleArray(array: string[]): string[] {
-    return array.sort(() => Math.random() - 0.5);
+    const copy = [...array];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
   }
-
-  showMessage(message: string, type: 'success' | 'error' | 'info' = 'info') {
-    const cameraOverlay = document.getElementById('camera-overlay');
-
-    if (cameraOverlay) {
-      cameraOverlay.innerHTML = message.toUpperCase();
-
-      switch (type) {
-        case 'success':
-          cameraOverlay.style.backgroundColor = 'rgba(0, 128, 0, 0.7)';
-          break;
-        case 'error':
-          cameraOverlay.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
-          break;
-        default:
-          cameraOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-      }
-    }
-
-    console.log(`[MENSAJE] ${message} (${type})`);
-  }
-
-  clearIntervals() {
-    if (this.countdownInterval) {
-      clearInterval(this.countdownInterval);
-      this.countdownInterval = null;
-      console.log('🛑 Countdown detenido.');
-    }
-
-    if (this.movementInterval) {
-      clearInterval(this.movementInterval);
-      this.movementInterval = null;
-      console.log('🛑 Movimiento detenido.');
-    }
-  }
-
-  capturePhotoBase64(): string | null {
-    const video: HTMLVideoElement = document.getElementById('webcam') as HTMLVideoElement;
-    if (!video) {
-      console.error('No se encontró el elemento de video');
-      return null;
-    }
-  
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-  
-    const context = canvas.getContext('2d');
-    if (!context) {
-      console.error('No se pudo obtener el contexto del canvas');
-      return null;
-    }
-  
-    // Dibuja el frame actual del video en el canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-  
-    // Convierte el canvas a imagen base64
-    const base64Image = canvas.toDataURL('image/jpeg', 0.9); // 90% calidad
-  
-    console.log('📸 Imagen capturada en base64:', base64Image);
-    return base64Image;
-  }
-
 }

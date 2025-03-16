@@ -1,58 +1,62 @@
-.controls {
+.container {
   display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-bottom: 20px;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  font-family: 'Arial', sans-serif;
 }
 
-button {
-  padding: 10px 20px;
-  font-size: 16px;
-  background-color: #005BAC;
+.top-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.top-buttons button {
+  background-color: #007bff;
   color: white;
+  padding: 12px 24px;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
+  font-size: 16px;
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
 
-button:hover {
-  background-color: #004080;
+.top-buttons button:hover {
+  background-color: #0056b3;
 }
 
-.camera-container {
+.video-container { 
+ 
   position: relative;
-  display: inline-block;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
-video {
-  width: 640px;
-  height: 480px;
-  background-color: black;
-  transform: scaleX(-1);
-  border-radius: 10px;
+video, canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  object-fit: cover; /* Hace que se adapte sin deformar */
 }
 
 .overlay-message {
   position: absolute;
-  top: 20px;
+  top: 10%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.7);
-  color: #FFFFFF;
-  padding: 15px 20px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  padding: 16px 24px;
   border-radius: 12px;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  text-align: center;
+  max-width: 90%;
 }
-
-.overlay-success {
-  background-color: rgba(0, 128, 0, 0.8);
-}
-
-.overlay-error {
-  background-color: rgba(200, 0, 0, 0.8);
+video {
+  transform: scaleX(-1); /* 🪞 Espejo */
 }
