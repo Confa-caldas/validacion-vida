@@ -100,10 +100,8 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
    //   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
    // );
 
-  // const vision = await FilesetResolver.forVisionTasks('/assets/modelos');
-   const vision = await FilesetResolver.forVisionTasks(
-    'https://master.d1s8c37h7djf3t.amplifyapp.com/assets/modelos'
-  );
+   const vision = await FilesetResolver.forVisionTasks('/assets/modelos');
+  // const vision = await FilesetResolver.forVisionTasks('https://master.d1s8c37h7djf3t.amplifyapp.com/assets/modelos');
 
     this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
       baseOptions: {
