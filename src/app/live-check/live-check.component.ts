@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { FaceLandmarker, FilesetResolver, FaceLandmarkerResult } from '@mediapipe/tasks-vision';
+import { LiveCheckService } from './live-check.service';
 
 @Component({
   selector: 'app-live-check',
@@ -35,30 +36,56 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
   parpadeosDetectados: number = 0;
   requeridosParpadeos: number = 3;
 
+  fotoCapturadaBase64: string = '';
+  LiveCheckService: any;
+
+  constructor(private apiService: LiveCheckService) { }
+
   ngOnInit() {
     // Puedes iniciar cámara aquí si lo deseas
     // this.iniciarCamara();
- 
+    window.addEventListener('resize', () => this.resizeCanvas());
   }
 
   ngOnDestroy() {
     this.detenerCamara();
+    window.removeEventListener('resize', () => this.resizeCanvas());
   }
 
   resizeCanvas() {
-    this.canvas.width = window.innerWidth;
-  this.canvas.height = window.innerHeight;
+    const isDesktop = window.innerWidth >= 768;
+  
+    const canvasWidth = isDesktop ? 640 : window.innerWidth;
+    const canvasHeight = isDesktop ? 480 : canvasWidth * 0.75; // 4:3 ratio
+  
+    this.canvas.width = canvasWidth;
+    this.canvas.height = canvasHeight;
+  
+    this.video.style.width = `${canvasWidth}px`;
+    this.video.style.height = `${canvasHeight}px`;
+  
+    console.log(`📐 Canvas resized: ${canvasWidth}x${canvasHeight}`);
   }
+  
 
   async iniciarCamara() {
     this.video = this.videoRef.nativeElement;
     this.canvas = this.canvasRef.nativeElement;
     this.ctx = this.canvas.getContext('2d')!;
-
+    const constraints = {
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: 'user' // Usa cámara frontal
+      }
+    };
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     this.video.srcObject = stream;
     await this.video.play();
-
+    this.video.onloadedmetadata = () => {
+      this.resizeCanvas();
+    };
+  
     await this.cargarModelo();
     this.procesarVideo();
   }
@@ -69,9 +96,12 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
   }
 
   async cargarModelo() {
-    const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-    );
+   // const vision = await FilesetResolver.forVisionTasks(
+   //   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+   // );
+
+   const vision = await FilesetResolver.forVisionTasks('/assets/modelos');
+
 
     this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
       baseOptions: {
@@ -108,6 +138,8 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
     processFrame();
   }
 
+  
+
   iniciarValidacion() {
     this.resetValidacion();
     if (this.validationInProgress) return;
@@ -140,6 +172,7 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
 
     if (this.esperaCentro) {
       if (this.estaCentrado(nose)) {
+        this.capturarFoto();
         this.esperaCentro = false;
         this.prepararSiguienteMovimiento();
       } else {
@@ -310,4 +343,25 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
     }
     return copy;
   }
+
+  capturarFoto() {
+    if (!this.canvas || !this.ctx) {
+      console.error('Canvas o contexto no definidos');
+      return;
+    }
+  
+    // Captura el contenido del canvas en formato Base64 PNG
+    const base64Image = this.canvas.toDataURL('image/png');
+  
+    console.log('📸 Imagen capturada en Base64:', base64Image);
+  
+    // Guarda el string base64 en tu variable para luego usarla o enviarla al servidor
+
+    this.apiService.validacionFacial(base64Image);
+  
+    // Si quieres mostrarla, ya tienes el string:
+    // this.fotoCapturadaBase64 contiene algo como: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA..."
+  }
+
+  
 }
