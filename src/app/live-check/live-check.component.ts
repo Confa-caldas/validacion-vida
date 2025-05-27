@@ -1,11 +1,14 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { FaceLandmarker, FilesetResolver, FaceLandmarkerResult } from '@mediapipe/tasks-vision';
 import { LiveCheckService } from './live-check.service';
+import { CommonModule } from '@angular/common'; // ✅ Importación clave para *ngIf
 
 @Component({
+  standalone: true, // ✅ Muy importante: este componente es independiente
   selector: 'app-live-check',
   templateUrl: './live-check.component.html',
-  styleUrls: ['./live-check.component.css']
+  styleUrls: ['./live-check.component.css'],
+  imports: [CommonModule] // ✅ Agrega esto
 })
 export class LiveCheckComponent implements OnInit, OnDestroy {
 
@@ -17,7 +20,7 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
   canvas!: HTMLCanvasElement;
   ctx!: CanvasRenderingContext2D;
 
-  movimientos = ['arriba', 'abajo', 'izquierda', 'derecha', 'acercarse'];
+  movimientos = ['izquierda', 'derecha', 'acercarse', 'arriba', 'abajo'];
   secuenciaMovimientos: string[] = [];
   pasoActual: number = 0;
 
@@ -34,12 +37,23 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
   blinkDetected = false;
   parpadeoActivo: boolean = false; // Evita conteo doble
   parpadeosDetectados: number = 0;
-  requeridosParpadeos: number = 3;
+  requeridosParpadeos: number = 2;
 
   fotoCapturadaBase64: string = '';
   LiveCheckService: any;
 
+  sessionId: string = '';
+
+  esperandoResultadoFinal: boolean = false; // ✅ AQUÍ la defines
+
+
   constructor(private apiService: LiveCheckService) { }
+
+  generateSessionId(): string {
+    const timestamp = Date.now(); // número de milisegundos desde 1970
+    const random = Math.random().toString(36).substring(2, 10); // 8 caracteres aleatorios
+    return `${timestamp}-${random}`;
+  }
 
   ngOnInit() {
     // Puedes iniciar cámara aquí si lo deseas
@@ -54,19 +68,19 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
 
   resizeCanvas() {
     const isDesktop = window.innerWidth >= 768;
-  
+
     const canvasWidth = isDesktop ? 640 : window.innerWidth;
     const canvasHeight = isDesktop ? 480 : canvasWidth * 0.75; // 4:3 ratio
-  
+
     this.canvas.width = canvasWidth;
     this.canvas.height = canvasHeight;
-  
+
     this.video.style.width = `${canvasWidth}px`;
     this.video.style.height = `${canvasHeight}px`;
-  
+
     console.log(`📐 Canvas resized: ${canvasWidth}x${canvasHeight}`);
   }
-  
+
 
   async iniciarCamara() {
     this.video = this.videoRef.nativeElement;
@@ -85,7 +99,7 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
     this.video.onloadedmetadata = () => {
       this.resizeCanvas();
     };
-  
+
     await this.cargarModelo();
     this.procesarVideo();
   }
@@ -96,12 +110,12 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
   }
 
   async cargarModelo() {
-   // const vision = await FilesetResolver.forVisionTasks(
-   //   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-   // );
+    // const vision = await FilesetResolver.forVisionTasks(
+    //   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    // );
 
-   const vision = await FilesetResolver.forVisionTasks('/assets/modelos');
-  // const vision = await FilesetResolver.forVisionTasks('https://master.d1s8c37h7djf3t.amplifyapp.com/assets/modelos');
+    const vision = await FilesetResolver.forVisionTasks('/assets/modelos');
+    // const vision = await FilesetResolver.forVisionTasks('https://master.d1s8c37h7djf3t.amplifyapp.com/assets/modelos');
 
     this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
       baseOptions: {
@@ -118,7 +132,11 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
       if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
         this.canvas.width = this.video.videoWidth;
         this.canvas.height = this.video.videoHeight;
-        this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+this.dibujarGuiaVisual(
+  this.esperaCentro ? null : this.secuenciaMovimientos[this.pasoActual]
+);
 
         const results: FaceLandmarkerResult = this.faceLandmarker.detectForVideo(this.video, performance.now());
         if (results.faceLandmarks.length > 0) {
@@ -138,12 +156,66 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
     processFrame();
   }
 
-  
+dibujarGuiaVisual(direccion: string | null = null) {
+  if (!this.canvas || !this.ctx) return;
+
+  const w = this.canvas.width;
+  const h = this.canvas.height;
+
+  let x = w / 2;
+  let y = h / 2;
+  let radioX = 80;
+  let radioY = 100;
+
+  // Si estamos en modo "centrar rostro", dibujamos guía central en color gris
+  if (this.esperaCentro) {
+    this.ctx.strokeStyle = '#9E9E9E'; // gris neutro
+    this.ctx.lineWidth = 2;
+    this.ctx.setLineDash([6, 6]); // línea punteada
+    this.ctx.beginPath();
+    this.ctx.ellipse(x, y, radioX, radioY, 0, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.setLineDash([]); // reset
+    return;
+  }
+
+  // Guía para movimiento activo
+  switch (direccion) {
+    case 'izquierda':
+      x = w * 0.75;
+      break;
+    case 'derecha':
+      x = w * 0.25;
+      break;
+    case 'arriba':
+      y = h * 0.25;
+      break;
+    case 'abajo':
+      y = h * 0.75;
+      break;
+    case 'acercarse':
+      radioX /= 2;
+      radioY /= 2;
+      break;
+    default:
+      break;
+  }
+
+  this.ctx.strokeStyle = '#2196F3'; // azul
+  this.ctx.lineWidth = 4;
+  this.ctx.beginPath();
+  this.ctx.ellipse(x, y, radioX, radioY, 0, 0, Math.PI * 2);
+  this.ctx.stroke();
+}
+
+
 
   iniciarValidacion() {
     this.resetValidacion();
     if (this.validationInProgress) return;
 
+    this.sessionId = this.generateSessionId();
+    console.log('🆔 Sesión de validación:', this.sessionId);
     console.log('🔄 Reiniciando validación...');
     this.validationInProgress = true;
     this.statusMessage = '🔄 Preparando validación...';
@@ -172,7 +244,7 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
 
     if (this.esperaCentro) {
       if (this.estaCentrado(nose)) {
-        this.capturarFoto();
+        //this.capturarFoto();
         this.esperaCentro = false;
         this.prepararSiguienteMovimiento();
       } else {
@@ -215,16 +287,20 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
 
     switch (movimientoActual) {
       case 'arriba':
-        movimientoDetectado = centroY < 0.45;
+        movimientoDetectado = centroY < 0.40;
+
         break;
       case 'abajo':
-        movimientoDetectado = centroY > 0.55;
+        movimientoDetectado = centroY > 0.60;
+
         break;
       case 'izquierda':
-        movimientoDetectado = centroX > 0.45;
+        movimientoDetectado = centroX > 0.60;
+
         break;
       case 'derecha':
-        movimientoDetectado = centroX < 0.55;
+        movimientoDetectado = centroX < 0.40;
+
         break;
       case 'acercarse':
         if (!this.distanciaInicial) {
@@ -240,6 +316,8 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
       console.log(`✅ Movimiento "${movimientoActual}" detectado correctamente`);
       clearTimeout(this.tiempoLimite);
       this.validandoMovimiento = false;
+
+      this.capturarFoto();
 
       this.pasoActual++;
 
@@ -268,7 +346,7 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
     if (distDerecho < umbralParpadeo && distIzquierdo < umbralParpadeo) {
       if (!this.parpadeoActivo) {
         this.parpadeoActivo = true;
-        this.parpadeosDetectados++;
+        this.parpadeosDetectados = this.parpadeosDetectados + 1;
         console.log(`👁️‍🗨️ Parpadeo detectado (${this.parpadeosDetectados}/${this.requeridosParpadeos})`);
       }
     } else {
@@ -287,13 +365,8 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
   }
 
   finalizarValidacion() {
-    if (this.parpadeosDetectados >= this.requeridosParpadeos) {
-      this.statusMessage = '✅ Validación exitosa. ¡Bien hecho!';
-      console.log('✔️ Validación completa');
-    } else {
-      this.statusMessage = '❌ Parpadeos insuficientes. Intenta de nuevo.';
-      console.log('❌ Faltaron parpadeos');
-    }
+    this.statusMessage = '📤 Validación de movimientos completada. Enviando resultados... para finalizar validación de prueba de vida';
+    console.log(`✔️ Movimientos validados. Parpadeos detectados: ${this.parpadeosDetectados}`);
 
     //this.resetValidacion();
   }
@@ -349,19 +422,48 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
       console.error('Canvas o contexto no definidos');
       return;
     }
-  
+
     // Captura el contenido del canvas en formato Base64 PNG
     const base64Image = this.canvas.toDataURL('image/png');
-  
-    console.log('📸 Imagen capturada en Base64:', base64Image);
-  
-    // Guarda el string base64 en tu variable para luego usarla o enviarla al servidor
+    const intentoActual = this.pasoActual + 1;  // Ej: si estás en pasoActual=2, este es intento 3
+    const movimientoActual = this.secuenciaMovimientos[this.pasoActual]; // "izquierda", "acercarse", etc.
+    const esUltimoPaso = intentoActual === this.secuenciaMovimientos.length;
 
-    this.apiService.validacionFacial(base64Image);
-  
-    // Si quieres mostrarla, ya tienes el string:
-    // this.fotoCapturadaBase64 contiene algo como: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA..."
+    // Guarda el string base64 en tu variable para luego usarla o enviarla al servidor
+    console.log(this.pasoActual + 1);
+    console.log(this.parpadeosDetectados);
+    this.apiService.validarFacial(this.sessionId,
+      base64Image,
+      this.pasoActual + 1, // +1 porque pasoActual empieza en 0
+      this.secuenciaMovimientos[this.pasoActual],
+      true,
+      this.parpadeosDetectados // ← podrías cambiar esto si falló);
+    ).subscribe({
+      next: (respuesta) => {
+  console.log('📥 Respuesta del backend:', respuesta);
+
+  let parsed: any = {};
+  try {
+    parsed = typeof respuesta.body === 'string'
+      ? JSON.parse(respuesta.body)
+      : respuesta.body;
+  } catch (e) {
+    console.error('❌ Error al parsear body:', e);
   }
 
-  
-}
+  if (esUltimoPaso && parsed?.score !== undefined) {
+    this.statusMessage = `Validación finalizada.\n
+Puntaje: ${parsed.score}/100\n
+Resultado: ${parsed.estadoFinal || 'No disponible'}`;
+    this.esperandoResultadoFinal = false;
+  } else if (esUltimoPaso) {
+    this.statusMessage = '✅ Validación completada, pero no se pudo recuperar el resultado final.';
+    this.esperandoResultadoFinal = false;
+  }
+},
+      error: (error) => {
+        console.error('❌ Error en la petición:', error);
+        this.statusMessage = '⚠️ Error al validar con el servidor.';
+      }
+    });
+  }}

@@ -106,3 +106,24 @@ body {
 video {
   transform: scaleX(-1); /* 🪞 Espejo */
 }
+
+.resultado-final {
+  background-color: #e8f5e9;
+  border: 1px solid #66bb6a;
+  padding: 20px;
+  margin-top: 20px;
+  border-radius: 8px;
+  font-size: 1.1em;
+  color: #2e7d32;
+  text-align: center;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+canvas.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}

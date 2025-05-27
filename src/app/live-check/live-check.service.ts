@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -8,32 +9,27 @@ export class LiveCheckService {
 
   constructor(private http: HttpClient) { }
 
-  validacionFacial(fotoBase64: string) {
-    const apiUrl = 'https://api-facial.confa.co/identificarvalidar'; // ✅ URL relativa al proxy
+  validarFacial(sessionId: string, fotoBase64: string, intento: number, tipoMovimiento: string, exitoso: boolean, parpadeos: number): Observable<any> {
+ 
+    const apiUrl = 'https://lo3llmhfb0.execute-api.us-east-1.amazonaws.com/PY/pruebadevida'; // ✅ URL relativa al proxy
     const imagenBase64 = fotoBase64.replace(/^data:image\/\w+;base64,/, '');
-   
-    console.log("hola "+imagenBase64);
-    const XAPIKEY = "qfdmzeFdxN2VetG1dYgRB4jLrxHrLTveaxss0aMH";
-  
+    const XAPIKEY = "C4Vq8h3L1r9nxz1fKDSoR4kaaL59ks2E8axGpXSG";
+ 
     const headers = new HttpHeaders({
       'Content-Type': 'application/json',
       'X-API-KEY': XAPIKEY
     });
-  
+ 
     const body = {
-      "imgdata":imagenBase64,
-        "excepcion": "ojos-boca-dimension-gafasDeSol",
-  "tipoValidacion": "validacion"
+      identificador: sessionId, // o el ID que estés usando
+      intento,
+      tipoMovimiento,
+      exitoso,
+      timestamp: new Date().toISOString(),
+      fotoBase64: imagenBase64,
+      parpadeos: parpadeos
     };
-  
-    this.http.post(apiUrl, body, { headers }).subscribe({
-      next: (response: any) => {
-        console.log('✅ Respuesta del servidor:', response);
-      },
-      error: (error) => {
-        console.error('❌ Error en la solicitud:', error);
-      }
-    });
+  return this.http.post(apiUrl, body, { headers });
   }
   
 }
