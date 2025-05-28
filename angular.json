@@ -25,7 +25,7 @@
               "src/assets",
               {
                 "glob": "**/*.wasm",
-                "input": "node_modules/@mediapipe/tasks-vision/",
+                "input": "src/assets/modelos",
                 "output": "/assets/modelos/"
               }
             ],
