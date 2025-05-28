@@ -26,7 +26,7 @@
               {
                 "glob": "**/*.wasm",
                 "input": "src/assets/modelos",
-                "output": "/assets/modelos/"
+                "output": "assets/modelos/"
               }
             ],
             "styles": [
