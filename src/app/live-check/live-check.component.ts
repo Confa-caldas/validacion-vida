@@ -110,22 +110,26 @@ export class LiveCheckComponent implements OnInit, OnDestroy {
   }
 
   async cargarModelo() {
-    // const vision = await FilesetResolver.forVisionTasks(
-    //   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-    // );
+  const wasmUrl = '/assets/modelos/vision_wasm_internal.wasm';
 
-    const vision = await FilesetResolver.forVisionTasks('/assets/modelos');
-    // const vision = await FilesetResolver.forVisionTasks('https://master.d1s8c37h7djf3t.amplifyapp.com/assets/modelos');
+  const response = await fetch(wasmUrl);
+  const wasmBinary = await response.arrayBuffer();
 
-    this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: '/assets/modelos/face_landmarker.task'
-      },
-      runningMode: 'VIDEO',
-      outputFaceBlendshapes: false,
-      outputFacialTransformationMatrixes: true
-    });
-  }
+  // Monkey patch: algunas versiones esperan esto globalmente
+  (globalThis as any).wasmBinary = wasmBinary;
+
+  const vision = await FilesetResolver.forVisionTasks('/assets/modelos');
+
+  this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: '/assets/modelos/face_landmarker.task'
+    },
+    runningMode: 'VIDEO',
+    outputFaceBlendshapes: false,
+    outputFacialTransformationMatrixes: true
+  });
+}
+
 
   procesarVideo() {
     const processFrame = async () => {
