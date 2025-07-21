@@ -22,11 +22,10 @@
             ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
-              "src/assets",
               {
                 "glob": "**/*",
-                "input": "src/assets/modelos",
-                "output": "assets/modelos/"
+                "input": "src/assets",
+                "output": "assets/"
               }
             ],
             "styles": [
