@@ -8,7 +8,8 @@
     "build:verify": "ng build && node scripts/verify-assets.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "verify-assets": "node scripts/verify-assets.js"
+    "verify-assets": "node scripts/verify-assets.js",
+    "invalidate-cache": "bash scripts/invalidate-cache.sh"
   },
   "private": true,
   "dependencies": {
