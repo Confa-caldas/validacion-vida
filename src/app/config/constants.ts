@@ -31,4 +31,21 @@ export const CANVAS_CONFIG = {
   DESKTOP_WIDTH: 640,
   DESKTOP_HEIGHT: 480,
   MOBILE_ASPECT_RATIO: 0.75
-} as const; 
+} as const;
+
+// Rutas para archivos de MediaPipe
+export const MEDIAPIPE_CONFIG = {
+  BASE_PATH: '/assets/modelos',
+  WASM_FILE: 'vision_wasm_internal.wasm',
+  FACE_LANDMARKER_TASK: 'face_landmarker.task',
+  FACE_LANDMARK_MODEL: 'face_landmark_68_model-shard1',
+  FACE_LANDMARK_MANIFEST: 'face_landmark_68_model-weights_manifest.json',
+  SSD_MODEL_SHARD1: 'ssd_mobilenetv1_model-shard1',
+  SSD_MODEL_SHARD2: 'ssd_mobilenetv1_model-shard2',
+  SSD_MANIFEST: 'ssd_mobilenetv1_model-weights_manifest.json'
+} as const;
+
+// Función helper para obtener la ruta completa de un archivo
+export function getMediaPipeAssetPath(filename: string): string {
+  return `${MEDIAPIPE_CONFIG.BASE_PATH}/${filename}`;
+} 

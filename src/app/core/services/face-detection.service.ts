@@ -3,6 +3,7 @@ import { FaceLandmarker, FilesetResolver, FaceLandmarkerResult } from '@mediapip
 import { BehaviorSubject, Observable } from 'rxjs';
 import { FaceLandmark, FaceDetectionResult } from '../models';
 import { FaceDetectionUtils } from '../../shared/utils/face-detection.utils';
+import { MEDIAPIPE_CONFIG, getMediaPipeAssetPath } from '../../config/constants';
 
 @Injectable({
   providedIn: 'root'
@@ -22,22 +23,71 @@ export class FaceDetectionService implements OnDestroy {
   }
 
   /**
+   * Verifica que todos los archivos necesarios estén disponibles
+   */
+  private async verifyAssets(): Promise<void> {
+    const requiredAssets = [
+      MEDIAPIPE_CONFIG.WASM_FILE,
+      MEDIAPIPE_CONFIG.FACE_LANDMARKER_TASK,
+      MEDIAPIPE_CONFIG.FACE_LANDMARK_MODEL,
+      MEDIAPIPE_CONFIG.FACE_LANDMARK_MANIFEST,
+      MEDIAPIPE_CONFIG.SSD_MODEL_SHARD1,
+      MEDIAPIPE_CONFIG.SSD_MODEL_SHARD2,
+      MEDIAPIPE_CONFIG.SSD_MANIFEST
+    ];
+
+    console.log('🔍 Verificando disponibilidad de archivos...');
+    
+    for (const asset of requiredAssets) {
+      const assetUrl = getMediaPipeAssetPath(asset);
+      try {
+        const response = await fetch(assetUrl, { method: 'HEAD' });
+        if (!response.ok) {
+          throw new Error(`Archivo no disponible: ${asset} (${response.status})`);
+        }
+        console.log(`✅ ${asset} - Disponible`);
+      } catch (error) {
+        console.error(`❌ ${asset} - Error:`, error);
+        throw new Error(`No se puede acceder al archivo: ${asset}`);
+      }
+    }
+    
+    console.log('✅ Todos los archivos están disponibles');
+  }
+
+  /**
    * Carga el modelo de MediaPipe
    */
   async loadModel(): Promise<void> {
     try {
-      const wasmUrl = '/assets/modelos/vision_wasm_internal.wasm';
-      const response = await fetch(wasmUrl);
-      const wasmBinary = await response.arrayBuffer();
+      console.log('🔄 Iniciando carga del modelo...');
+      
+      // Verificar que todos los archivos estén disponibles
+      await this.verifyAssets();
+      
+      const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE);
+      console.log('📁 Intentando cargar WASM desde:', wasmUrl);
+      
+      // Verificar que el archivo WASM existe
+      const wasmResponse = await fetch(wasmUrl);
+      if (!wasmResponse.ok) {
+        throw new Error(`No se pudo cargar el archivo WASM: ${wasmResponse.status} ${wasmResponse.statusText}`);
+      }
+      
+      const wasmBinary = await wasmResponse.arrayBuffer();
+      console.log('✅ Archivo WASM cargado correctamente, tamaño:', wasmBinary.byteLength, 'bytes');
 
       // Monkey patch: algunas versiones esperan esto globalmente
       (globalThis as any).wasmBinary = wasmBinary;
 
-      const vision = await FilesetResolver.forVisionTasks('/assets/modelos');
+      console.log('🔄 Cargando FilesetResolver...');
+      const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_CONFIG.BASE_PATH);
+      console.log('✅ FilesetResolver cargado correctamente');
 
+      console.log('🔄 Creando FaceLandmarker...');
       this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: '/assets/modelos/face_landmarker.task'
+          modelAssetPath: getMediaPipeAssetPath(MEDIAPIPE_CONFIG.FACE_LANDMARKER_TASK)
         },
         runningMode: 'VIDEO',
         outputFaceBlendshapes: false,
@@ -48,6 +98,10 @@ export class FaceDetectionService implements OnDestroy {
       console.log('✅ Modelo de detección facial cargado correctamente');
     } catch (error) {
       console.error('❌ Error al cargar el modelo:', error);
+      console.error('❌ Detalles del error:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       throw new Error('No se pudo cargar el modelo de detección facial');
     }
   }

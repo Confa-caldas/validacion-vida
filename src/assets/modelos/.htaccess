@@ -1,0 +1,24 @@
+# Configuración para archivos WebAssembly
+<Files "*.wasm">
+    Header set Content-Type "application/wasm"
+    Header set Cross-Origin-Embedder-Policy "require-corp"
+    Header set Cross-Origin-Opener-Policy "same-origin"
+    Header set Access-Control-Allow-Origin "*"
+</Files>
+
+# Configuración para archivos JavaScript
+<Files "*.js">
+    Header set Content-Type "application/javascript"
+    Header set Access-Control-Allow-Origin "*"
+</Files>
+
+# Configuración para archivos JSON
+<Files "*.json">
+    Header set Content-Type "application/json"
+    Header set Access-Control-Allow-Origin "*"
+</Files>
+
+# Configuración general de CORS
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type" 

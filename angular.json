@@ -48,7 +48,15 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": {
+                "all": false,
+                "bundles": true,
+                "chunks": true,
+                "fonts": true,
+                "media": true,
+                "scripts": true,
+                "styles": true
+              }
             },
             "development": {
               "optimization": false,
