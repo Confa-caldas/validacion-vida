@@ -4,6 +4,7 @@
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Opener-Policy: same-origin
   Access-Control-Allow-Origin: *
+  Cache-Control: no-cache, no-store, must-revalidate
 
 # Headers para archivos JavaScript
 /assets/modelos/*.js
