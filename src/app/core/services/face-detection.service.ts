@@ -68,14 +68,28 @@ export class FaceDetectionService implements OnDestroy {
       const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE);
       console.log('📁 Intentando cargar WASM desde:', wasmUrl);
       
-      // Verificar que el archivo WASM existe
+      // Verificar que el archivo WASM existe y tiene el contenido correcto
       const wasmResponse = await fetch(wasmUrl);
       if (!wasmResponse.ok) {
         throw new Error(`No se pudo cargar el archivo WASM: ${wasmResponse.status} ${wasmResponse.statusText}`);
       }
       
+      // Verificar que el Content-Type sea correcto
+      const contentType = wasmResponse.headers.get('content-type');
+      if (contentType && !contentType.includes('application/wasm') && !contentType.includes('application/octet-stream')) {
+        console.warn('⚠️ Content-Type incorrecto para WASM:', contentType);
+        console.warn('⚠️ Esto puede causar problemas de carga');
+      }
+      
       const wasmBinary = await wasmResponse.arrayBuffer();
       console.log('✅ Archivo WASM cargado correctamente, tamaño:', wasmBinary.byteLength, 'bytes');
+
+      // Verificar que el archivo WASM tenga el magic number correcto
+      const uint8Array = new Uint8Array(wasmBinary);
+      const magicNumber = Array.from(uint8Array.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      if (magicNumber !== '00 61 73 6d') {
+        throw new Error(`Archivo WASM inválido. Magic number esperado: 00 61 73 6d, encontrado: ${magicNumber}`);
+      }
 
       // Monkey patch: algunas versiones esperan esto globalmente
       (globalThis as any).wasmBinary = wasmBinary;
