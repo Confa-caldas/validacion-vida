@@ -1,9 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const distPath = path.join(__dirname, '../dist/camara-video-validacion/assets/modelos');
-const distAssetsPath = path.join(__dirname, '../dist/camara-video-validacion/assets');
+// Angular 19 coloca los archivos en browser/
+const distPath = path.join(__dirname, '../dist/camara-video-validacion/browser/assets/modelos');
+const distAssetsPath = path.join(__dirname, '../dist/camara-video-validacion/browser/assets');
 const distRootPath = path.join(__dirname, '../dist/camara-video-validacion');
+const distBrowserPath = path.join(__dirname, '../dist/camara-video-validacion/browser');
 
 const requiredFiles = [
   'vision_wasm_internal.wasm',
@@ -25,9 +27,9 @@ if (!fs.existsSync(distRootPath)) {
   process.exit(1);
 }
 
-// Verificar si el directorio assets existe
-if (!fs.existsSync(distAssetsPath)) {
-  console.error('❌ El directorio assets no existe:', distAssetsPath);
+// Verificar si el directorio browser existe
+if (!fs.existsSync(distBrowserPath)) {
+  console.error('❌ El directorio browser no existe:', distBrowserPath);
   console.log('📂 Contenido del directorio raíz:');
   try {
     const rootContents = fs.readdirSync(distRootPath);
@@ -38,6 +40,23 @@ if (!fs.existsSync(distAssetsPath)) {
     });
   } catch (error) {
     console.error('❌ Error al leer directorio raíz:', error.message);
+  }
+  process.exit(1);
+}
+
+// Verificar si el directorio assets existe
+if (!fs.existsSync(distAssetsPath)) {
+  console.error('❌ El directorio assets no existe:', distAssetsPath);
+  console.log('📂 Contenido del directorio browser:');
+  try {
+    const browserContents = fs.readdirSync(distBrowserPath);
+    browserContents.forEach(item => {
+      const itemPath = path.join(distBrowserPath, item);
+      const stats = fs.statSync(itemPath);
+      console.log(`  ${item} - ${stats.isDirectory() ? 'DIR' : 'FILE'}`);
+    });
+  } catch (error) {
+    console.error('❌ Error al leer directorio browser:', error.message);
   }
   process.exit(1);
 }

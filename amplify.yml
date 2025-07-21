@@ -11,7 +11,7 @@ frontend:
       commands:
         - npm run build:verify
   artifacts:
-    baseDirectory: dist/camara-video-validacion
+    baseDirectory: dist/camara-video-validacion/browser
     files:
       - '**/*'
   cache:
