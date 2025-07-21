@@ -1,0 +1,64 @@
+<div class="container">
+  <!-- Botones de control -->
+  <div class="top-buttons">
+    <button 
+      (click)="startCamera()" 
+      [disabled]="isCameraActive"
+      class="btn btn-primary">
+      🎥 Iniciar Cámara
+    </button>
+    
+    <button 
+      (click)="startValidation()" 
+      [disabled]="!isCameraActive || isValidationInProgress"
+      class="btn btn-success">
+      ✅ Iniciar Validación
+    </button>
+    
+    <button 
+      (click)="stopCamera()" 
+      [disabled]="!isCameraActive"
+      class="btn btn-danger">
+      ❌ Detener Cámara
+    </button>
+  </div>
+
+  <!-- Contenedor de video -->
+  <div class="video-container">
+    <video 
+      #video 
+      autoplay 
+      muted 
+      playsinline 
+      style="transform: scaleX(-1);">
+    </video>
+    
+    <canvas 
+      #canvas 
+      class="overlay" 
+      style="position: absolute; top: 0; left: 0; transform: scaleX(-1);">
+    </canvas>
+
+    <!-- Mensaje de estado superpuesto -->
+    <div class="overlay-message">
+      {{ statusMessage }}
+    </div>
+
+    <!-- Indicador de carga del modelo -->
+    <div *ngIf="!isModelLoaded && isCameraActive" class="loading-indicator">
+      <div class="spinner"></div>
+      <span>Cargando modelo de detección...</span>
+    </div>
+  </div>
+
+  <div class="status-container">
+    <div class="status-message" [class.success]="isValidationSuccessful" [class.error]="isValidationFailed">
+      {{ statusMessage }}
+    </div>
+  </div>
+
+  <!-- Mensaje de espera de resultado -->
+  <div *ngIf="isWaitingForResult" class="waiting-result">
+    ⏳ Validando información... esperando resultado final del backend.
+  </div>
+</div> 
