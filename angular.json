@@ -22,7 +22,12 @@
             ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
-              "src/assets"
+              "src/assets",
+              {
+                "glob": "**/*",
+                "input": "src/assets/modelos",
+                "output": "assets/modelos/"
+              }
             ],
             "styles": [
               "src/styles.css"
@@ -43,7 +48,7 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "none"
             },
             "development": {
               "optimization": false,
