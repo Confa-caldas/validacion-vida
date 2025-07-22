@@ -6,9 +6,10 @@ const distPath = path.join(__dirname, '../dist/camara-video-validacion/browser/a
 const distAssetsPath = path.join(__dirname, '../dist/camara-video-validacion/browser/assets');
 const distRootPath = path.join(__dirname, '../dist/camara-video-validacion');
 const distBrowserPath = path.join(__dirname, '../dist/camara-video-validacion/browser');
+const headersPath = path.join(__dirname, '../dist/camara-video-validacion/browser/_headers');
 
 const requiredFiles = [
-  'vision_wasm_internal.wasm',
+  'vision_wasm_internal_v2.wasm', // Nuevo nombre para evitar caché
   'vision_wasm_internal.js',
   'face_landmarker.task',
   'face_landmark_68_model-shard1',
@@ -20,6 +21,16 @@ const requiredFiles = [
 
 console.log('🔍 Verificando archivos de MediaPipe...');
 console.log('📁 Buscando en:', distPath);
+
+// Verificar si el archivo _headers existe
+if (fs.existsSync(headersPath)) {
+  console.log('✅ Archivo _headers encontrado en:', headersPath);
+  const headersContent = fs.readFileSync(headersPath, 'utf8');
+  console.log('📄 Contenido del archivo _headers:');
+  console.log(headersContent);
+} else {
+  console.error('❌ Archivo _headers NO encontrado en:', headersPath);
+}
 
 // Verificar si el directorio raíz existe
 if (!fs.existsSync(distRootPath)) {
@@ -87,7 +98,17 @@ for (const file of requiredFiles) {
   const filePath = path.join(distPath, file);
   if (fs.existsSync(filePath)) {
     const stats = fs.statSync(filePath);
-    console.log(`✅ ${file} - ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+    const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+    console.log(`✅ ${file} - ${sizeMB} MB`);
+    
+    // Verificar tamaños mínimos esperados
+    if (file === 'vision_wasm_internal_v2.wasm' && stats.size < 1000000) {
+      console.error(`⚠️ ADVERTENCIA: ${file} es muy pequeño (${sizeMB} MB). Debería ser ~9MB`);
+    }
+    if (file === 'vision_wasm_internal.js' && stats.size < 100000) {
+      console.error(`⚠️ ADVERTENCIA: ${file} es muy pequeño (${sizeMB} MB). Debería ser ~200KB`);
+    }
+    
     foundFiles.push(file);
   } else {
     console.error(`❌ ${file} - NO ENCONTRADO`);
