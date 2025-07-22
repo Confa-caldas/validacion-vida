@@ -1,0 +1,35 @@
+# Headers para archivos WebAssembly - forzar invalidación de caché
+/assets/modelos/*.wasm
+  Content-Type: application/wasm
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+  Access-Control-Allow-Origin: *
+
+# Headers para archivos JavaScript
+/assets/modelos/*.js
+  Content-Type: application/javascript
+  Access-Control-Allow-Origin: *
+
+# Headers para archivos JSON
+/assets/modelos/*.json
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *
+
+# Headers para archivos .task
+/assets/modelos/*.task
+  Content-Type: application/octet-stream
+  Access-Control-Allow-Origin: *
+
+# Headers para archivos .shard
+/assets/modelos/*-shard*
+  Content-Type: application/octet-stream
+  Access-Control-Allow-Origin: *
+
+# Headers generales para todos los archivos
+/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, POST, OPTIONS
+  Access-Control-Allow-Headers: Content-Type 
