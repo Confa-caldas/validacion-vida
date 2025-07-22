@@ -114,9 +114,20 @@ export class FaceDetectionService implements OnDestroy {
       console.error('❌ Error al cargar el modelo:', error);
       console.error('❌ Detalles del error:', {
         message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : 'Unknown',
+        constructor: error?.constructor?.name || 'Unknown'
       });
-      throw new Error('No se pudo cargar el modelo de detección facial');
+      
+      // Información adicional para debug
+      console.error('🔍 Información de debug:');
+      console.error('  - URL del WASM:', getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE));
+      console.error('  - Base path:', MEDIAPIPE_CONFIG.BASE_PATH);
+      console.error('  - Task path:', getMediaPipeAssetPath(MEDIAPIPE_CONFIG.FACE_LANDMARKER_TASK));
+      
+      // Lanzar error más descriptivo
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`No se pudo cargar el modelo de detección facial: ${errorMessage}`);
     }
   }
 
