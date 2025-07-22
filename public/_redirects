@@ -1,9 +1,10 @@
-# Headers para archivos WebAssembly - forzar invalidación de caché
+# Headers para archivos WebAssembly - invalidación agresiva de caché
 /assets/modelos/*.wasm
   Content-Type: application/wasm
-  Cache-Control: no-cache, no-store, must-revalidate
+  Cache-Control: no-cache, no-store, must-revalidate, max-age=0
   Pragma: no-cache
-  Expires: 0
+  Expires: Thu, 01 Jan 1970 00:00:00 GMT
+  Surrogate-Control: no-store
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Opener-Policy: same-origin
   Access-Control-Allow-Origin: *

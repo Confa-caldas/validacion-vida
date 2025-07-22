@@ -65,7 +65,9 @@ export class FaceDetectionService implements OnDestroy {
       // Verificar que todos los archivos estén disponibles
       await this.verifyAssets();
       
-      const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE) + '?v=' + Date.now();
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(7);
+      const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE) + `?v=${timestamp}&r=${random}&nocache=true`;
       console.log('📁 Intentando cargar WASM desde:', wasmUrl);
       
       // Verificar que el archivo WASM existe y tiene el contenido correcto
