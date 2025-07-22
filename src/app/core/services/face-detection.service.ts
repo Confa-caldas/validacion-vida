@@ -65,9 +65,9 @@ export class FaceDetectionService implements OnDestroy {
       // Verificar que todos los archivos estén disponibles
       await this.verifyAssets();
       
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(7);
-      const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE) + `?v=${timestamp}&r=${random}&nocache=true`;
+      // Generar un hash único basado en el contenido del archivo
+      const fileHash = await this.generateFileHash();
+      const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE) + `?v=${fileHash}&nocache=true&t=${Date.now()}`;
       console.log('📁 Intentando cargar WASM desde:', wasmUrl);
       
       // Verificar que el archivo WASM existe y tiene el contenido correcto
@@ -186,5 +186,26 @@ export class FaceDetectionService implements OnDestroy {
    */
   private cleanup(): void {
     this.detectionSubject.complete();
+  }
+
+  /**
+   * Genera un hash único para el archivo WASM
+   */
+  private async generateFileHash(): Promise<string> {
+    try {
+      const response = await fetch(getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE), { method: 'HEAD' });
+      const etag = response.headers.get('etag') || '';
+      const lastModified = response.headers.get('last-modified') || '';
+      const contentLength = response.headers.get('content-length') || '';
+      
+      // Crear un hash basado en los headers
+      const hashInput = `${etag}-${lastModified}-${contentLength}`;
+      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput));
+      const hashArray = Array.from(new Uint8Array(hash));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 8);
+    } catch (error) {
+      console.warn('⚠️ No se pudo generar hash, usando timestamp:', error);
+      return Date.now().toString();
+    }
   }
 } 

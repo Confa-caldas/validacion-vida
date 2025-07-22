@@ -9,7 +9,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "verify-assets": "node scripts/verify-assets.js",
-    "invalidate-cache": "bash scripts/invalidate-cache.sh"
+    "invalidate-cache": "bash scripts/invalidate-cloudfront.sh",
+    "deploy": "npm run build:verify && npm run invalidate-cache"
   },
   "private": true,
   "dependencies": {

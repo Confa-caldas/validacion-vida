@@ -1,29 +1,37 @@
-# Headers para archivos WebAssembly
+# Headers para archivos WebAssembly - invalidación agresiva
 /assets/modelos/*.wasm
   Content-Type: application/wasm
+  Cache-Control: no-cache, no-store, must-revalidate, max-age=0, s-maxage=0
+  Pragma: no-cache
+  Expires: Thu, 01 Jan 1970 00:00:00 GMT
+  Surrogate-Control: no-store
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Opener-Policy: same-origin
   Access-Control-Allow-Origin: *
-  Cache-Control: no-cache, no-store, must-revalidate
+  X-Content-Type-Options: nosniff
 
 # Headers para archivos JavaScript
 /assets/modelos/*.js
   Content-Type: application/javascript
+  Cache-Control: public, max-age=31536000
   Access-Control-Allow-Origin: *
 
 # Headers para archivos JSON
 /assets/modelos/*.json
   Content-Type: application/json
+  Cache-Control: public, max-age=31536000
   Access-Control-Allow-Origin: *
 
 # Headers para archivos .task
 /assets/modelos/*.task
   Content-Type: application/octet-stream
+  Cache-Control: public, max-age=31536000
   Access-Control-Allow-Origin: *
 
 # Headers para archivos .shard
 /assets/modelos/*-shard*
   Content-Type: application/octet-stream
+  Cache-Control: public, max-age=31536000
   Access-Control-Allow-Origin: *
 
 # Headers generales para todos los archivos
