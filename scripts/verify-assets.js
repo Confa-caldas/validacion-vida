@@ -9,7 +9,7 @@ const distBrowserPath = path.join(__dirname, '../dist/camara-video-validacion/br
 const headersPath = path.join(__dirname, '../dist/camara-video-validacion/browser/_headers');
 
 const requiredFiles = [
-  'vision_wasm_internal_v2.wasm', // Nuevo nombre para evitar caché
+  'vision_wasm_internal.wasm', // Nuevo nombre para evitar caché
   'vision_wasm_internal.js',
   'face_landmarker.task',
   'face_landmark_68_model-shard1',
@@ -102,7 +102,7 @@ for (const file of requiredFiles) {
     console.log(`✅ ${file} - ${sizeMB} MB`);
     
     // Verificar tamaños mínimos esperados
-    if (file === 'vision_wasm_internal_v2.wasm' && stats.size < 1000000) {
+    if (file === 'vision_wasm_internal.wasm' && stats.size < 1000000) {
       console.error(`⚠️ ADVERTENCIA: ${file} es muy pequeño (${sizeMB} MB). Debería ser ~9MB`);
     }
     if (file === 'vision_wasm_internal.js' && stats.size < 100000) {

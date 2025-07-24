@@ -36,7 +36,7 @@ export class ApiService {
       parpadeos
     };
 
-    return this.http.post<ApiResponse<ValidationResponse>>(API_CONFIG.BASE_URL, request, {
+    return this.http.post<any>(API_CONFIG.BASE_URL, request, {
       headers: new HttpHeaders(API_CONFIG.HEADERS)
     }).pipe(
       map(response => this.parseApiResponse(response)),
@@ -47,8 +47,16 @@ export class ApiService {
   /**
    * Parsea la respuesta de la API
    */
-  private parseApiResponse(response: ApiResponse<ValidationResponse>): ValidationResponse {
-    if (typeof response.body === 'string') {
+  private parseApiResponse(response: any): ValidationResponse {
+    console.log('🔍 Respuesta raw del backend:', response);
+    
+    // Si la respuesta ya es un objeto (caso más común)
+    if (typeof response === 'object' && response !== null) {
+      return response;
+    }
+    
+    // Si la respuesta tiene estructura { body: ... }
+    if (response && typeof response.body === 'string') {
       try {
         return JSON.parse(response.body);
       } catch (e) {
@@ -56,7 +64,19 @@ export class ApiService {
         return { success: false, message: 'Error al procesar respuesta' };
       }
     }
-    return response.body;
+    
+    // Si la respuesta es un string JSON
+    if (typeof response === 'string') {
+      try {
+        return JSON.parse(response);
+      } catch (e) {
+        console.error('❌ Error al parsear respuesta string:', e);
+        return { success: false, message: 'Error al procesar respuesta' };
+      }
+    }
+    
+    console.error('❌ Formato de respuesta no reconocido:', response);
+    return { success: false, message: 'Formato de respuesta no válido' };
   }
 
   /**

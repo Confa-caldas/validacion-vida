@@ -9,6 +9,18 @@ import { ValidationUtils } from '../../../shared/utils/validation.utils';
 import { FaceDetectionUtils } from '../../../shared/utils/face-detection.utils';
 import { STATUS_MESSAGES } from '../../../config/constants';
 import { VALIDATION_CONFIG } from '../../../config/api.config';
+import { API_CONFIG } from '../../../config/api.config';
+
+// Interface temporal para extender ValidationState con campos adicionales
+interface ExtendedValidationState extends ValidationState {
+  identificador?: string;
+  score?: number;
+  estadoFinal?: string;
+  totalParpadeos?: number;
+  error?: string;
+  currentMovement?: string;
+  fotoBase64?: string;
+}
 
 export interface ValidationStep {
   movement: string;
@@ -279,6 +291,12 @@ export class LivenessDetectionService implements OnDestroy {
    * Analiza la respuesta del backend de manera más inteligente
    */
   private analyzeBackendResponse(response: any): boolean {
+    // Verificar que response no sea undefined o null
+    if (!response) {
+      console.warn('⚠️ analyzeBackendResponse: response es undefined o null');
+      return false;
+    }
+    
     // Verificar si hay score y es mayor a 80 para validación exitosa
     if (response.score && response.score >= 80) {
       return true;
@@ -311,6 +329,12 @@ export class LivenessDetectionService implements OnDestroy {
    * Obtiene el mensaje de resultado basado en la respuesta del backend
    */
   private getValidationResultMessage(response: any): string {
+    // Verificar que response no sea undefined o null
+    if (!response) {
+      console.warn('⚠️ getValidationResultMessage: response es undefined o null');
+      return '❌ Error: Respuesta inválida del servidor';
+    }
+    
     const score = response.score || 0;
     const estadoFinal = response.estadoFinal || '';
     const totalParpadeos = response.totalParpadeos || 0;
@@ -387,6 +411,16 @@ export class LivenessDetectionService implements OnDestroy {
       ).subscribe({
         next: (response) => {
           console.log('✅ Respuesta del backend:', response);
+          
+          // Verificar que response no sea undefined
+          if (!response) {
+            console.error('❌ Error: Respuesta del backend es undefined');
+            this.updateValidationState({
+              statusMessage: '⚠️ Error: Respuesta inválida del servidor'
+            });
+            return;
+          }
+          
           console.log(`🔍 Análisis de respuesta:`, {
             exitosos: response.exitosos,
             totalMovimientosEsperados: this.movementSequence.length,
@@ -396,7 +430,7 @@ export class LivenessDetectionService implements OnDestroy {
           });
           
           // Verificar si hay discrepancia
-          if (response.exitosos !== this.movementSequence.length) {
+          if (response.exitosos !== undefined && response.exitosos !== this.movementSequence.length) {
             console.warn(`⚠️ DISCREPANCIA DETECTADA: Backend reporta ${response.exitosos} exitosos pero frontend completó ${this.movementSequence.length} movimientos`);
             console.warn(`📋 Movimientos completados en frontend: [${currentState.movementsCompleted.join(', ')}]`);
           }
@@ -462,6 +496,16 @@ export class LivenessDetectionService implements OnDestroy {
     this.timeoutSubscription?.unsubscribe();
     this.preparationSubscription?.unsubscribe();
     
+    // Verificar que backendResponse no sea undefined o null
+    if (!backendResponse) {
+      console.error('❌ Error: backendResponse es undefined en finalizeValidationWithResponse');
+      this.updateValidationState({
+        isInProgress: false,
+        statusMessage: '❌ Error: Respuesta inválida del servidor'
+      });
+      return;
+    }
+    
     // Usar la respuesta real del backend en lugar de datos simulados
     const finalResponse = {
       score: backendResponse.score || 0,
@@ -482,30 +526,7 @@ export class LivenessDetectionService implements OnDestroy {
     console.log(`📋 Estado final - Movimientos completados: [${currentState.movementsCompleted.join(', ')}]`);
   }
 
-  /**
-   * Finaliza la validación con mensaje de resultado (método legacy - ya no se usa)
-   */
-  private finalizeValidation(): void {
-    const currentState = this.validationStateSubject.value;
-    
-    // Obtener la respuesta final del backend (esto necesitaría ser implementado)
-    // Por ahora, simulamos la respuesta
-    const finalResponse = {
-      score: 85, // Esto vendría del backend
-      estadoFinal: 'Exitosa',
-      totalParpadeos: currentState.blinksDetected
-    };
-    
-    const resultMessage = this.getValidationResultMessage(finalResponse);
-    
-    this.updateValidationState({
-      isInProgress: false,
-      currentStep: -1, // -1 indica que la validación ha terminado, no mostrar círculos
-      statusMessage: resultMessage
-    });
 
-    console.log(`✔️ Validación finalizada. ${resultMessage}`);
-  }
 
   /**
    * Falla la validación
@@ -588,5 +609,66 @@ export class LivenessDetectionService implements OnDestroy {
    */
   getMovementSequence(): string[] {
     return [...this.movementSequence];
+  }
+
+  // Método ajustado para finalizar validación (ajusta el nombre si es diferente)
+  async finalizarValidacion(currentState: ValidationState): Promise<ExtendedValidationState> { // Usamos ValidationState y ExtendedValidationState
+    try {
+      // Preparar datos a enviar al backend (ajusta según lo que necesite tu Lambda)
+      const datos = {
+        identificador: (currentState as any).identificador || 'unknown', // Usa any temporal para evitar TS2339 si no existe
+        intento: currentState.currentStep,
+        tipoMovimiento: (currentState as any).currentMovement || 'unknown',
+        exitoso: true, // O basado en lógica
+        timestamp: new Date().toISOString(),
+        fotoBase64: (currentState as any).fotoBase64 || '',
+        parpadeos: currentState.blinksDetected || 0
+      };
+
+      console.log('📤 Enviando datos finales a backend:', datos);
+
+      // Llamada POST real a la Lambda
+      const response = await fetch(API_CONFIG.BASE_URL + '/pruebadevida', { // Ajusta '/pruebadevida' si es diferente
+        method: 'POST',
+        headers: API_CONFIG.HEADERS,
+        body: JSON.stringify(datos)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error en backend: ${response.status} - ${await response.text()}`);
+      }
+
+      const finalResponse = await response.json();
+      console.log('✅ Respuesta del backend:', finalResponse);
+
+      // Verificar que finalResponse no sea undefined y tenga 'exitosos'
+      if (!finalResponse || typeof finalResponse.exitosos === 'undefined') {
+        throw new Error('Respuesta inválida de API: faltan datos esperados (exitosos)');
+      }
+
+      // Actualizar estado con datos reales (usamos ExtendedValidationState para agregar properties)
+      const updatedState: ExtendedValidationState = {
+        ...currentState,
+        isInProgress: false,
+        score: finalResponse.score,
+        estadoFinal: finalResponse.estadoFinal,
+        totalParpadeos: finalResponse.totalParpadeos
+      };
+
+      this.validationStateSubject.next(updatedState);
+
+      return updatedState;
+    } catch (error: unknown) { // Tipo error como unknown para TS18046
+      console.error('❌ Error al finalizar validación:', error);
+      // Manejar error en UI (agregamos 'error' usando ExtendedValidationState)
+      const errorState: ExtendedValidationState = {
+        ...currentState,
+        isInProgress: false,
+        statusMessage: 'Error al procesar validación final: ' + (error instanceof Error ? error.message : 'Desconocido'),
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      };
+      this.validationStateSubject.next(errorState);
+      return errorState;
+    }
   }
 } 

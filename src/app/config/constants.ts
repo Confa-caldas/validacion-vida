@@ -36,7 +36,7 @@ export const CANVAS_CONFIG = {
 // Rutas para archivos de MediaPipe
 export const MEDIAPIPE_CONFIG = {
   BASE_PATH: '/assets/modelos',
-  WASM_FILE: 'vision_wasm_internal_v2.wasm', // Nuevo nombre para evitar caché
+  WASM_FILE: 'vision_wasm_internal.wasm', // Nuevo nombre para evitar caché
   FACE_LANDMARKER_TASK: 'face_landmarker.task',
   FACE_LANDMARK_MODEL: 'face_landmark_68_model-shard1',
   FACE_LANDMARK_MANIFEST: 'face_landmark_68_model-weights_manifest.json',

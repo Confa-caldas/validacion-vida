@@ -1,9 +1,7 @@
 export const API_CONFIG = {
-  BASE_URL: 'https://lo3llmhfb0.execute-api.us-east-1.amazonaws.com/PY/pruebadevida',
-  API_KEY: 'C4Vq8h3L1r9nxz1fKDSoR4kaaL59ks2E8axGpXSG',
+  BASE_URL: 'https://ikm6sw4rdl.execute-api.us-east-1.amazonaws.com/pruebadevida',
   HEADERS: {
-    'Content-Type': 'application/json',
-    'X-API-KEY': 'C4Vq8h3L1r9nxz1fKDSoR4kaaL59ks2E8axGpXSG'
+    'Content-Type': 'application/json'
   }
 } as const;
 

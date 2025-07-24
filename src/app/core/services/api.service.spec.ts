@@ -55,7 +55,6 @@ describe('ApiService', () => {
     const req = httpMock.expectOne(API_CONFIG.BASE_URL);
     expect(req.request.method).toBe('POST');
     expect(req.request.headers.get('Content-Type')).toBe('application/json');
-    expect(req.request.headers.get('X-API-KEY')).toBe(API_CONFIG.API_KEY);
 
     const expectedBody = {
       identificador: mockRequest.sessionId,
