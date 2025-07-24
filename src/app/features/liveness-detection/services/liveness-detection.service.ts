@@ -198,7 +198,7 @@ export class LivenessDetectionService implements OnDestroy {
 
     // Timeout para el movimiento
     this.timeoutSubscription = timer(VALIDATION_CONFIG.MOVEMENT_TIMEOUT).subscribe(() => {
-      this.failValidation('⏰ Tiempo agotado');
+      this.handleMovementTimeout();
     });
   }
 
@@ -527,6 +527,63 @@ export class LivenessDetectionService implements OnDestroy {
   }
 
 
+
+  /**
+   * Maneja el timeout de un movimiento - captura foto y envía como fallido
+   */
+  private handleMovementTimeout(): void {
+    const currentMovement = this.movementSequence[this.currentMovementIndex];
+    const currentStep = this.currentMovementIndex + 1;
+    
+    console.log(`⏰ Timeout en movimiento: ${currentMovement} (paso ${currentStep})`);
+    
+    // Capturar foto y enviar como fallido
+    this.captureAndSendPhotoFailed(currentMovement, currentStep, '⏰ Tiempo agotado');
+  }
+
+  /**
+   * Captura foto y envía al backend como fallido
+   */
+  private captureAndSendPhotoFailed(movement: string, step: number, reason: string): void {
+    try {
+      // Obtener el canvas del componente
+      const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+      if (!canvas) {
+        console.error('❌ No se encontró el canvas para capturar foto');
+        this.failValidation(reason);
+        return;
+      }
+
+      // Convertir canvas a base64
+      const fotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+      const currentState = this.validationStateSubject.value;
+
+      console.log(`📸 Capturando foto fallida para movimiento: ${movement}, paso: ${step}, razón: ${reason}`);
+
+      // Enviar al backend como fallido
+      this.apiService.validarFacial(
+        currentState.sessionId,
+        fotoBase64,
+        step,
+        movement,
+        false, // exitoso = false
+        currentState.blinksDetected
+      ).subscribe({
+        next: (response) => {
+          console.log('✅ Registro fallido enviado al backend:', response);
+          this.failValidation(`${reason} - Movimiento: ${movement}`);
+        },
+        error: (error) => {
+          console.error('❌ Error al enviar registro fallido:', error);
+          this.failValidation(`${reason} - Error al registrar`);
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error al capturar foto fallida:', error);
+      this.failValidation(reason);
+    }
+  }
 
   /**
    * Falla la validación

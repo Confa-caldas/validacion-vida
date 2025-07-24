@@ -33,11 +33,11 @@ export const CANVAS_CONFIG = {
   MOBILE_ASPECT_RATIO: 0.75
 } as const;
 
-// Rutas para archivos de MediaPipe
+// Rutas para archivos de MediaPipe - Usando CDN oficial
 export const MEDIAPIPE_CONFIG = {
-  BASE_PATH: '/assets/modelos',
-  WASM_FILE: 'vision_wasm_internal.wasm', // Nuevo nombre para evitar caché
-  FACE_LANDMARKER_TASK: 'face_landmarker.task',
+  BASE_PATH: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm',
+  WASM_FILE: 'vision_wasm_internal.wasm',
+  FACE_LANDMARKER_TASK: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
   FACE_LANDMARK_MODEL: 'face_landmark_68_model-shard1',
   FACE_LANDMARK_MANIFEST: 'face_landmark_68_model-weights_manifest.json',
   SSD_MODEL_SHARD1: 'ssd_mobilenetv1_model-shard1',
@@ -47,5 +47,16 @@ export const MEDIAPIPE_CONFIG = {
 
 // Función helper para obtener la ruta completa de un archivo
 export function getMediaPipeAssetPath(filename: string): string {
+  // Si el archivo ya es una URL completa, devolverla tal como está
+  if (filename.startsWith('http')) {
+    return filename;
+  }
+  
+  // Si es el archivo WASM, usar el CDN de MediaPipe
+  if (filename === MEDIAPIPE_CONFIG.WASM_FILE) {
+    return `${MEDIAPIPE_CONFIG.BASE_PATH}/${filename}`;
+  }
+  
+  // Para otros archivos, usar la ruta base
   return `${MEDIAPIPE_CONFIG.BASE_PATH}/${filename}`;
 } 

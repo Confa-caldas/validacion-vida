@@ -23,36 +23,23 @@ export class FaceDetectionService implements OnDestroy {
   }
 
   /**
-   * Verifica que todos los archivos necesarios estén disponibles
+   * Verifica que el archivo WASM esté disponible
    */
-  private async verifyAssets(): Promise<void> {
-    const requiredAssets = [
-      MEDIAPIPE_CONFIG.WASM_FILE,
-      MEDIAPIPE_CONFIG.FACE_LANDMARKER_TASK,
-      MEDIAPIPE_CONFIG.FACE_LANDMARK_MODEL,
-      MEDIAPIPE_CONFIG.FACE_LANDMARK_MANIFEST,
-      MEDIAPIPE_CONFIG.SSD_MODEL_SHARD1,
-      MEDIAPIPE_CONFIG.SSD_MODEL_SHARD2,
-      MEDIAPIPE_CONFIG.SSD_MANIFEST
-    ];
-
-    console.log('🔍 Verificando disponibilidad de archivos...');
+  private async verifyWasmAsset(): Promise<void> {
+    const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE);
     
-    for (const asset of requiredAssets) {
-      const assetUrl = getMediaPipeAssetPath(asset);
-      try {
-        const response = await fetch(assetUrl, { method: 'HEAD' });
-        if (!response.ok) {
-          throw new Error(`Archivo no disponible: ${asset} (${response.status})`);
-        }
-        console.log(`✅ ${asset} - Disponible`);
-      } catch (error) {
-        console.error(`❌ ${asset} - Error:`, error);
-        throw new Error(`No se puede acceder al archivo: ${asset}`);
+    console.log('🔍 Verificando archivo WASM...');
+    
+    try {
+      const response = await fetch(wasmUrl, { method: 'HEAD' });
+      if (!response.ok) {
+        throw new Error(`Archivo WASM no disponible: ${response.status}`);
       }
+      console.log(`✅ WASM - Disponible en: ${wasmUrl}`);
+    } catch (error) {
+      console.error(`❌ WASM - Error:`, error);
+      throw new Error(`No se puede acceder al archivo WASM: ${wasmUrl}`);
     }
-    
-    console.log('✅ Todos los archivos están disponibles');
   }
 
   /**
@@ -62,39 +49,15 @@ export class FaceDetectionService implements OnDestroy {
     try {
       console.log('🔄 Iniciando carga del modelo...');
       
-      // Verificar que todos los archivos estén disponibles
-      await this.verifyAssets();
+      // Verificar que el archivo WASM esté disponible
+      await this.verifyWasmAsset();
       
-      // Generar un hash único basado en el contenido del archivo
-      const fileHash = await this.generateFileHash();
-      const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE) + `?v=${fileHash}&nocache=true&t=${Date.now()}`;
-      console.log('📁 Intentando cargar WASM desde:', wasmUrl);
+      // Cargar WASM desde CDN oficial de MediaPipe
+      const wasmUrl = getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE);
+      console.log('📁 Cargando WASM desde CDN oficial:', wasmUrl);
       
-      // Verificar que el archivo WASM existe y tiene el contenido correcto
-      const wasmResponse = await fetch(wasmUrl);
-      if (!wasmResponse.ok) {
-        throw new Error(`No se pudo cargar el archivo WASM: ${wasmResponse.status} ${wasmResponse.statusText}`);
-      }
-      
-      // Verificar que el Content-Type sea correcto
-      const contentType = wasmResponse.headers.get('content-type');
-      if (contentType && !contentType.includes('application/wasm') && !contentType.includes('application/octet-stream')) {
-        console.warn('⚠️ Content-Type incorrecto para WASM:', contentType);
-        console.warn('⚠️ Esto puede causar problemas de carga');
-      }
-      
-      const wasmBinary = await wasmResponse.arrayBuffer();
-      console.log('✅ Archivo WASM cargado correctamente, tamaño:', wasmBinary.byteLength, 'bytes');
-
-      // Verificar que el archivo WASM tenga el magic number correcto
-      const uint8Array = new Uint8Array(wasmBinary);
-      const magicNumber = Array.from(uint8Array.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-      if (magicNumber !== '00 61 73 6d') {
-        throw new Error(`Archivo WASM inválido. Magic number esperado: 00 61 73 6d, encontrado: ${magicNumber}`);
-      }
-
-      // Monkey patch: algunas versiones esperan esto globalmente
-      (globalThis as any).wasmBinary = wasmBinary;
+      // Monkey patch: establecer la URL del WASM globalmente
+      (globalThis as any).wasmBinary = wasmUrl;
 
       console.log('🔄 Cargando FilesetResolver...');
       const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_CONFIG.BASE_PATH);
@@ -188,24 +151,5 @@ export class FaceDetectionService implements OnDestroy {
     this.detectionSubject.complete();
   }
 
-  /**
-   * Genera un hash único para el archivo WASM
-   */
-  private async generateFileHash(): Promise<string> {
-    try {
-      const response = await fetch(getMediaPipeAssetPath(MEDIAPIPE_CONFIG.WASM_FILE), { method: 'HEAD' });
-      const etag = response.headers.get('etag') || '';
-      const lastModified = response.headers.get('last-modified') || '';
-      const contentLength = response.headers.get('content-length') || '';
-      
-      // Crear un hash basado en los headers
-      const hashInput = `${etag}-${lastModified}-${contentLength}`;
-      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput));
-      const hashArray = Array.from(new Uint8Array(hash));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 8);
-    } catch (error) {
-      console.warn('⚠️ No se pudo generar hash, usando timestamp:', error);
-      return Date.now().toString();
-    }
-  }
+
 } 
