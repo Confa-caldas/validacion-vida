@@ -14,7 +14,7 @@
           "builder": "@angular-devkit/build-angular:application",
           "options": {
             
-            "outputPath": "dist/camara-video-validacion",
+            "outputPath": "dist/camara-video-validacion/browser",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
