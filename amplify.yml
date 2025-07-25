@@ -13,68 +13,14 @@ frontend:
         - npm run build:verify
         - echo "📁 Verificando archivos generados..."
         - ls -la dist/camara-video-validacion/ || echo "❌ No se encontró el directorio dist"
-        - echo "🔄 Forzando invalidación de caché..."
-        - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/assets/modelos/*" || echo "⚠️ No se pudo invalidar caché automáticamente"
   artifacts:
-    baseDirectory: dist/camara-video-validacion
+    baseDirectory: dist/camara-video-validacion/browser
     files:
       - '**/*'
   cache:
     paths:
       - .npm/**/*
   customHeaders:
-    - pattern: "assets/modelos/*.wasm"
-      headers:
-        - key: "Content-Type"
-          value: "application/wasm"
-        - key: "Cache-Control"
-          value: "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0"
-        - key: "Pragma"
-          value: "no-cache"
-        - key: "Expires"
-          value: "Thu, 01 Jan 1970 00:00:00 GMT"
-        - key: "Surrogate-Control"
-          value: "no-store"
-        - key: "Cross-Origin-Embedder-Policy"
-          value: "require-corp"
-        - key: "Cross-Origin-Opener-Policy"
-          value: "same-origin"
-        - key: "Access-Control-Allow-Origin"
-          value: "*"
-        - key: "X-Content-Type-Options"
-          value: "nosniff"
-    - pattern: "assets/modelos/*.js"
-      headers:
-        - key: "Content-Type"
-          value: "application/javascript"
-        - key: "Cache-Control"
-          value: "public, max-age=31536000"
-        - key: "Access-Control-Allow-Origin"
-          value: "*"
-    - pattern: "assets/modelos/*.json"
-      headers:
-        - key: "Content-Type"
-          value: "application/json"
-        - key: "Cache-Control"
-          value: "public, max-age=31536000"
-        - key: "Access-Control-Allow-Origin"
-          value: "*"
-    - pattern: "assets/modelos/*.task"
-      headers:
-        - key: "Content-Type"
-          value: "application/octet-stream"
-        - key: "Cache-Control"
-          value: "public, max-age=31536000"
-        - key: "Access-Control-Allow-Origin"
-          value: "*"
-    - pattern: "assets/modelos/*-shard*"
-      headers:
-        - key: "Content-Type"
-          value: "application/octet-stream"
-        - key: "Cache-Control"
-          value: "public, max-age=31536000"
-        - key: "Access-Control-Allow-Origin"
-          value: "*"
     - pattern: "**/*"
       headers:
         - key: "Access-Control-Allow-Origin"
