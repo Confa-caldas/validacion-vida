@@ -3,9 +3,10 @@ import { LivenessDetectionComponent } from "./features/liveness-detection/compon
 
 @Component({
   selector: 'app-root',
+  standalone: true,
   imports: [LivenessDetectionComponent],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+  styleUrls: ['./app.component.css']
 })
 export class AppComponent {
   title = 'camara-video-validacion';

@@ -14,7 +14,7 @@
           "builder": "@angular-devkit/build-angular:application",
           "options": {
             
-            "outputPath": "dist/camara-video-validacion/browser",
+            "outputPath": "dist/camara-video-validacion",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -22,16 +22,8 @@
             ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
-              {
-                "glob": "**/*",
-                "input": "src/assets",
-                "output": "assets/"
-              },
-              {
-                "glob": "**/*",
-                "input": "public",
-                "output": "/"
-              }
+              "src/favicon.ico",
+              "src/assets"
             ],
             "styles": [
               "src/styles.css"
@@ -63,7 +55,6 @@
           "defaultConfiguration": "production"
         },
         "serve": {
-  
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {

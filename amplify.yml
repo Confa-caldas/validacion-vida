@@ -11,10 +11,12 @@ frontend:
     build:
       commands:
         - npm run build:verify
+        - echo "📁 Verificando archivos generados..."
+        - ls -la dist/camara-video-validacion/ || echo "❌ No se encontró el directorio dist"
         - echo "🔄 Forzando invalidación de caché..."
         - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/assets/modelos/*" || echo "⚠️ No se pudo invalidar caché automáticamente"
   artifacts:
-    baseDirectory: dist/camara-video-validacion/browser
+    baseDirectory: dist/camara-video-validacion
     files:
       - '**/*'
   cache:

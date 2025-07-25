@@ -6,6 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "build:verify": "ng build --configuration production",
+    "build:check": "ng build --configuration production && ls -la dist/camara-video-validacion/",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "audit:fix": "npm audit fix"
