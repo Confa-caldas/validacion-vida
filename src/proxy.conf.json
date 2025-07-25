@@ -1,8 +1,0 @@
-{
-    "/api-facial": {
-      "target": "https://api-facial.confa.co",
-      "secure": false,
-      "changeOrigin": true,
-      "logLevel": "debug"
-    }
-  }

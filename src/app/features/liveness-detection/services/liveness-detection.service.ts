@@ -74,6 +74,15 @@ export class LivenessDetectionService implements OnDestroy {
       this.movementSequence = ValidationUtils.generateRandomMovementSequence();
       this.currentMovementIndex = 0; // Resetear índice de movimiento
       
+      // Validar que la secuencia se generó correctamente
+      if (!this.movementSequence || this.movementSequence.length === 0) {
+        throw new Error('No se pudo generar la secuencia de movimientos');
+      }
+      
+      console.log('🆔 Sesión de validación:', sessionId);
+      console.log('🎲 Secuencia generada:', this.movementSequence);
+      console.log('📊 Longitud de secuencia:', this.movementSequence.length);
+      
       // Actualizar estado
       this.updateValidationState({
         isInProgress: true,
@@ -83,9 +92,6 @@ export class LivenessDetectionService implements OnDestroy {
         blinksDetected: 0,
         statusMessage: STATUS_MESSAGES.PREPARING
       });
-
-      console.log('🆔 Sesión de validación:', sessionId);
-      console.log('🎲 Secuencia:', this.movementSequence);
 
       // Cargar modelo si no está cargado
       if (!this.faceDetectionService.isModelReady()) {
@@ -171,10 +177,7 @@ export class LivenessDetectionService implements OnDestroy {
         this.preparationSubscription?.unsubscribe();
       } else {
         this.updateValidationState({
-          statusMessage: ValidationUtils.formatStatusMessage(
-            STATUS_MESSAGES.PREPARE_MOVEMENT, 
-            { movement }
-          ) + ` en ${countdown}...`
+          statusMessage: `Prepárate para "${movement}" en ${countdown}...`
         });
         countdown--;
       }
@@ -190,10 +193,7 @@ export class LivenessDetectionService implements OnDestroy {
     console.log(`🎯 Iniciando validación del movimiento: ${movement}`);
 
     this.updateValidationState({
-      statusMessage: ValidationUtils.formatStatusMessage(
-        STATUS_MESSAGES.PERFORM_MOVEMENT, 
-        { movement }
-      )
+      statusMessage: `Realiza el movimiento: "${movement}"`
     });
 
     // Timeout para el movimiento
@@ -249,16 +249,21 @@ export class LivenessDetectionService implements OnDestroy {
 
     console.log(`✅ Movimiento "${movement}" detectado correctamente`);
 
+    // Obtener el siguiente movimiento antes de incrementar el índice
+    const nextMovementIndex = this.currentMovementIndex + 1;
+    const nextMovement = nextMovementIndex < this.movementSequence.length 
+      ? this.movementSequence[nextMovementIndex] 
+      : null;
+    
     // Incrementar el índice del movimiento
     this.currentMovementIndex++;
 
     if (this.currentMovementIndex >= this.movementSequence.length) {
       // Último movimiento completado - capturar foto y esperar respuesta del backend
-      // Actualizar el estado con el último movimiento completado y cambiar a modo "esperando resultado"
       this.updateValidationState({
         movementsCompleted: newMovementsCompleted,
         currentStep: -1, // Cambiar a modo "terminado" inmediatamente
-        statusMessage: '⏳ Procesando validación final...'
+        statusMessage: `✅ Movimiento "${movement}" completado. Procesando validación final...`
       });
       
       console.log(`📋 Movimientos completados actualizados: [${newMovementsCompleted.join(', ')}]`);
@@ -268,11 +273,15 @@ export class LivenessDetectionService implements OnDestroy {
       // Capturar foto y enviar al backend (no es el último)
       this.captureAndSendPhoto(movement, this.currentMovementIndex, false);
       
-      // Mostrar mensaje de transición por 2 segundos
+      // Mostrar mensaje específico con el movimiento completado y el siguiente
+      const nextMessage = nextMovement 
+        ? `Prepárate para "${nextMovement}"...`
+        : 'Prepárate para el siguiente movimiento...';
+        
       this.updateValidationState({
         currentStep: 0, // Volver a modo centrado
         movementsCompleted: newMovementsCompleted,
-        statusMessage: `✅ Movimiento completado. Prepárate para el siguiente...`
+        statusMessage: `✅ Movimiento "${movement}" completado. ${nextMessage}`
       });
       
       // Resetear distancia inicial para el siguiente movimiento
@@ -371,22 +380,46 @@ export class LivenessDetectionService implements OnDestroy {
   }
 
   /**
+   * Captura una foto del video sin el círculo azul de guía
+   */
+  private captureCleanPhoto(): string {
+    const video = document.querySelector('video') as HTMLVideoElement;
+    if (!video) {
+      throw new Error('No se encontró el video para capturar foto');
+    }
+
+    // Crear un canvas temporal para capturar la foto sin círculo azul
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    if (!tempCtx) {
+      throw new Error('No se pudo obtener el contexto del canvas temporal');
+    }
+
+    // Configurar el canvas temporal con las mismas dimensiones que el video
+    tempCanvas.width = video.videoWidth;
+    tempCanvas.height = video.videoHeight;
+
+    // Dibujar el frame actual del video en el canvas temporal
+    tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+    // Convertir el canvas temporal a base64 (sin círculo azul)
+    return tempCanvas.toDataURL('image/jpeg', 0.8);
+  }
+
+  /**
    * Captura foto y envía al backend
    */
   private captureAndSendPhoto(movement: string, step: number, isLastMovement: boolean = false): void {
+    let fotoBase64: string;
+    let currentState: any;
+    
     try {
-      // Obtener el canvas del componente
-      const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-      if (!canvas) {
-        console.error('❌ No se encontró el canvas para capturar foto');
-        return;
-      }
+      // Capturar foto limpia sin círculo azul
+      fotoBase64 = this.captureCleanPhoto();
+      currentState = this.validationStateSubject.value;
 
-      // Convertir canvas a base64
-      const fotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
-      const currentState = this.validationStateSubject.value;
-
-      console.log(`📸 Capturando foto para movimiento: ${movement}, paso: ${step}${isLastMovement ? ' (ÚLTIMO)' : ''}`);
+      console.log(`📸 Capturando foto limpia para movimiento: ${movement}, paso: ${step}${isLastMovement ? ' (ÚLTIMO)' : ''}`);
       console.log(`📊 Datos enviados al backend:`, {
         sessionId: currentState.sessionId,
         intento: step,
@@ -445,16 +478,25 @@ export class LivenessDetectionService implements OnDestroy {
               // Es el último movimiento - finalizar con la respuesta real del backend
               this.finalizeValidationWithResponse(response);
             } else {
-              // No es el último - solo actualizar estado
+              // No es el último - mostrar confirmación específica
+              const nextMovementIndex = this.currentMovementIndex + 1;
+              const nextMovement = nextMovementIndex < this.movementSequence.length 
+                ? this.movementSequence[nextMovementIndex] 
+                : null;
+                
+              const nextMessage = nextMovement 
+                ? `Prepárate para "${nextMovement}"...`
+                : 'Prepárate para el siguiente movimiento...';
+                
               this.updateValidationState({
-                statusMessage: `✅ ${movement} completado correctamente`
+                statusMessage: `✅ Movimiento "${movement}" validado. ${nextMessage}`
               });
             }
           } else {
             console.warn(`⚠️ Movimiento ${movement} rechazado por el servidor:`, response.message);
             // Mostrar mensaje específico del backend
             this.updateValidationState({
-              statusMessage: `⚠️ ${response.message || 'Error en validación'}`
+              statusMessage: `⚠️ Movimiento "${movement}" rechazado: ${response.message || 'Error en validación'}`
             });
           }
         },
@@ -479,9 +521,9 @@ export class LivenessDetectionService implements OnDestroy {
       });
 
     } catch (error) {
-      console.error('❌ Error al capturar foto:', error);
+      console.error('❌ Error al capturar foto limpia:', error);
       this.updateValidationState({
-        statusMessage: '⚠️ Error al procesar imagen'
+        statusMessage: '⚠️ Error al capturar imagen. Intenta de nuevo.'
       });
     }
   }
@@ -537,8 +579,18 @@ export class LivenessDetectionService implements OnDestroy {
     
     console.log(`⏰ Timeout en movimiento: ${currentMovement} (paso ${currentStep})`);
     
+    // Validar que el movimiento no sea undefined
+    const movementName = currentMovement && currentMovement !== 'undefined' 
+      ? currentMovement 
+      : 'movimiento actual';
+    
+    // Mostrar mensaje específico de timeout
+    this.updateValidationState({
+      statusMessage: `⏰ Tiempo agotado para el movimiento "${movementName}". Intenta de nuevo.`
+    });
+    
     // Capturar foto y enviar como fallido
-    this.captureAndSendPhotoFailed(currentMovement, currentStep, '⏰ Tiempo agotado');
+    this.captureAndSendPhotoFailed(currentMovement || 'unknown', currentStep, '⏰ Tiempo agotado');
   }
 
   /**
@@ -546,19 +598,11 @@ export class LivenessDetectionService implements OnDestroy {
    */
   private captureAndSendPhotoFailed(movement: string, step: number, reason: string): void {
     try {
-      // Obtener el canvas del componente
-      const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-      if (!canvas) {
-        console.error('❌ No se encontró el canvas para capturar foto');
-        this.failValidation(reason);
-        return;
-      }
-
-      // Convertir canvas a base64
-      const fotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+      // Capturar foto limpia sin círculo azul
+      const fotoBase64 = this.captureCleanPhoto();
       const currentState = this.validationStateSubject.value;
 
-      console.log(`📸 Capturando foto fallida para movimiento: ${movement}, paso: ${step}, razón: ${reason}`);
+      console.log(`📸 Capturando foto limpia fallida para movimiento: ${movement}, paso: ${step}, razón: ${reason}`);
 
       // Enviar al backend como fallido
       this.apiService.validarFacial(
@@ -592,12 +636,15 @@ export class LivenessDetectionService implements OnDestroy {
     this.timeoutSubscription?.unsubscribe();
     this.preparationSubscription?.unsubscribe();
 
+    // Obtener el movimiento actual si está disponible
+    const currentMovement = this.getCurrentMovement();
+    const specificMessage = currentMovement && currentMovement !== 'undefined'
+      ? `❌ Validación fallida en movimiento "${currentMovement}": ${message}. Intenta de nuevo.`
+      : `❌ Validación fallida: ${message}. Intenta de nuevo.`;
+
     this.updateValidationState({
       isInProgress: false,
-      statusMessage: ValidationUtils.formatStatusMessage(
-        STATUS_MESSAGES.VALIDATION_FAILED, 
-        { message }
-      )
+      statusMessage: specificMessage
     });
 
     console.log('❌ Fallo en la validación');
@@ -654,11 +701,40 @@ export class LivenessDetectionService implements OnDestroy {
       return null; // Modo centrado
     }
     
-    if (this.currentMovementIndex >= 0 && this.currentMovementIndex < this.movementSequence.length) {
-      return this.movementSequence[this.currentMovementIndex];
+    // Validar que el índice esté dentro del rango válido
+    if (this.currentMovementIndex >= 0 && 
+        this.currentMovementIndex < this.movementSequence.length && 
+        this.movementSequence.length > 0) {
+      const movement = this.movementSequence[this.currentMovementIndex];
+      // Verificar que el movimiento no sea undefined
+      if (movement && typeof movement === 'string') {
+        return movement;
+      }
     }
     
+    console.warn(`⚠️ getCurrentMovement: Índice fuera de rango o movimiento undefined`, {
+      currentMovementIndex: this.currentMovementIndex,
+      sequenceLength: this.movementSequence.length,
+      sequence: this.movementSequence
+    });
+    
     return null;
+  }
+
+  /**
+   * Obtiene el progreso actual de la validación
+   */
+  getValidationProgress(): { current: number; total: number; percentage: number } {
+    const currentState = this.validationStateSubject.value;
+    const completed = currentState.movementsCompleted.length;
+    const total = this.movementSequence.length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    return {
+      current: completed,
+      total,
+      percentage
+    };
   }
 
   /**
