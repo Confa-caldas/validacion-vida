@@ -2,8 +2,19 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { API_CONFIG } from '../../config/api.config';
-import { ValidationRequest, ValidationResponse, ApiResponse, ApiError } from '../models';
+import { API_CONFIG, DETECTION_API_CONFIG } from '../../config/api.config';
+import { ValidationRequest, ValidationResponse, ApiError } from '../models';
+
+// Interfaz para la respuesta de gestos disponibles
+export interface GestosDisponibles {
+  gestos_movimiento: string[];
+  gestos_faciales: string[];
+  total_gestos: number;
+  gestos_por_categoria: {
+    movimiento: number;
+    facial: number;
+  };
+}
 
 @Injectable({
   providedIn: 'root'
@@ -11,6 +22,21 @@ import { ValidationRequest, ValidationResponse, ApiResponse, ApiError } from '..
 export class ApiService {
 
   constructor(private http: HttpClient) { }
+
+  /**
+   * Obtiene los gestos disponibles desde el backend
+   */
+  obtenerGestosDisponibles(): Observable<GestosDisponibles> {
+    const url = `${DETECTION_API_CONFIG.BASE_URL}${DETECTION_API_CONFIG.ENDPOINTS.GESTOS_DISPONIBLES}`;
+    
+    console.log('🌐 Consultando endpoint de gestos disponibles:');
+    console.log('   📍 URL:', url);
+    console.log('   🔧 Método: GET');
+    
+    return this.http.get<GestosDisponibles>(url).pipe(
+      catchError(this.handleError)
+    );
+  }
 
   /**
    * Valida facialmente al usuario enviando datos al backend

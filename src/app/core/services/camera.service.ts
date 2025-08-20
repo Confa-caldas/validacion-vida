@@ -71,18 +71,4 @@ export class CameraService {
   isCameraActive(): boolean {
     return this.isActiveSubject.value;
   }
-
-  /**
-   * Obtiene el stream actual
-   */
-  getCurrentStream(): MediaStream | null {
-    return this.streamSubject.value;
-  }
-
-  /**
-   * Verifica si el navegador soporta getUserMedia
-   */
-  isSupported(): boolean {
-    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  }
 } 

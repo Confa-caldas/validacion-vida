@@ -29,6 +29,7 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
   isCameraActive = false;
   isModelLoaded = false;
   isWaitingForResult = false;
+  blinkDetected = false; // Indicador de parpadeo detectado
 
   // Subscripciones
   private validationSubscription?: Subscription;
@@ -67,6 +68,14 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
     this.detectionSubscription = this.faceDetectionService.detection$.subscribe(
       detection => {
         if (detection) {
+          // Actualizar indicador de parpadeo
+          this.blinkDetected = detection.blinkDetected;
+          
+          // Solo mostrar log cuando se detecta parpadeo
+          if (detection.blinkDetected) {
+            console.log('👁️ ¡Parpadeo detectado!');
+          }
+          
           this.livenessService.processDetection(detection);
         }
       }
@@ -97,11 +106,15 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
         this.resizeCanvas();
       };
 
+      this.isCameraActive = true;
       await this.loadModel();
       this.startVideoProcessing();
 
+      console.log('✅ Cámara iniciada correctamente');
+
     } catch (error) {
       console.error('❌ Error al iniciar cámara:', error);
+      this.isCameraActive = false;
       alert(`Error al iniciar cámara: ${error}`);
     }
   }
@@ -112,6 +125,9 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
   stopCamera(): void {
     this.cameraService.stopCamera();
     this.stopVideoProcessing();
+    this.isCameraActive = false;
+    this.isModelLoaded = false;
+    console.log('🛑 Cámara detenida y procesamiento detenido');
   }
 
   /**
@@ -119,11 +135,18 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
    */
   private async loadModel(): Promise<void> {
     try {
+      // Verificar que el servidor de Python esté disponible
+      const serverAvailable = await this.faceDetectionService.checkServerAvailability();
+      if (!serverAvailable) {
+        throw new Error('Servidor de Python no disponible. Verifica que esté ejecutándose en http://localhost');
+      }
+
       await this.faceDetectionService.loadModel();
       this.isModelLoaded = true;
       console.log('✅ Modelo cargado correctamente');
     } catch (error) {
       console.error('❌ Error al cargar modelo:', error);
+      this.isModelLoaded = false;
       throw error;
     }
   }
@@ -132,11 +155,19 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
    * Inicia el procesamiento de video
    */
   private startVideoProcessing(): void {
-    const processFrame = () => {
-      if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
-        this.processVideoFrame();
+    const processFrame = async () => {
+      // Verificar que la cámara esté activa antes de procesar
+      if (this.isCameraActive && this.video && this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+        await this.processVideoFrame();
       }
-      this.animationFrameId = requestAnimationFrame(processFrame);
+      
+      // Continuar el loop solo si la validación no ha terminado
+      if (!this.validationState || this.validationState.currentStep !== -1) {
+        this.animationFrameId = requestAnimationFrame(processFrame);
+      } else {
+        console.log('🛑 Deteniendo procesamiento de video - Validación completada');
+        this.animationFrameId = undefined; // Limpiar el ID
+      }
     };
     processFrame();
   }
@@ -154,7 +185,24 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
   /**
    * Procesa un frame de video
    */
-  private processVideoFrame(): void {
+  private async processVideoFrame(): Promise<void> {
+    // Verificar que la cámara esté activa y el video disponible
+    if (!this.isCameraActive || !this.video || this.video.paused || this.video.ended) {
+      return;
+    }
+
+    // Verificar si la validación ha terminado para evitar llamadas innecesarias al API
+    if (this.validationState && this.validationState.currentStep === -1) {
+      // La validación ha terminado, solo dibujar el canvas sin procesar detección
+      this.canvas.width = this.video.videoWidth;
+      this.canvas.height = this.video.videoHeight;
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+      
+      console.log('🛑 Validación completada - Deteniendo llamadas al API de Python');
+      return;
+    }
+
     // Configurar canvas
     this.canvas.width = this.video.videoWidth;
     this.canvas.height = this.video.videoHeight;
@@ -164,11 +212,24 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
     // Dibujar guía visual
     this.drawVisualGuide();
 
-    // Procesar detección facial
-    const detectionResult = this.faceDetectionService.processVideoFrame(this.video);
-    if (detectionResult) {
-      // Pasar directamente al servicio de liveness detection
-      this.livenessService.processDetection(detectionResult);
+    // Procesar detección facial con API de Python
+    try {
+      // Obtener información de sesión y movimiento actual
+      const sessionId = this.validationState?.sessionId || '';
+      const currentMovement = this.getCurrentMovement() || 'centrado';
+      
+      const detectionResult = await this.faceDetectionService.processVideoFrame(
+        this.video, 
+        sessionId, 
+        currentMovement
+      );
+      
+      if (detectionResult) {
+        // Pasar directamente al servicio de liveness detection
+        this.livenessService.processDetection(detectionResult);
+      }
+    } catch (error) {
+      console.error('❌ Error al procesar frame:', error);
     }
   }
 
@@ -222,6 +283,12 @@ export class LivenessDetectionComponent implements OnInit, OnDestroy {
   async startValidation(): Promise<void> {
     try {
       await this.livenessService.startValidation();
+      
+      // Reiniciar el procesamiento de video si se detuvo
+      if (!this.animationFrameId) {
+        console.log('🔄 Reiniciando procesamiento de video para nueva validación');
+        this.startVideoProcessing();
+      }
     } catch (error) {
       console.error('❌ Error al iniciar validación:', error);
       alert(`Error al iniciar validación: ${error}`);

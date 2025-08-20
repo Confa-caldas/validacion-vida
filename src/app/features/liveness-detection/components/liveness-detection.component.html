@@ -43,6 +43,11 @@
     <div class="overlay-message">
       {{ statusMessage }}
     </div>
+    
+    <!-- Indicador de parpadeo -->
+    <!-- <div *ngIf="blinkDetected" class="blink-indicator">
+      👁️ ¡Parpadeo detectado!
+    </div> -->
 
     <!-- Indicador de carga del modelo -->
     <div *ngIf="!isModelLoaded && isCameraActive" class="loading-indicator">

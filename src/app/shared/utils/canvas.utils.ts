@@ -64,10 +64,10 @@ export class CanvasUtils {
     // Guía para movimiento activo
     switch (direction) {
       case 'izquierda':
-        x = w * 0.75;
+        x = w * 0.25;  // Círculo a la izquierda
         break;
       case 'derecha':
-        x = w * 0.25;
+        x = w * 0.75;  // Círculo a la derecha
         break;
       case 'arriba':
         y = h * 0.25;
